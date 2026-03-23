@@ -65,10 +65,11 @@
   left: 24px;
   right: auto;
   bottom: 220px;
+  top: auto;
   width: 430px;
   max-width: min(430px, calc(100vw - 48px));
-  height: min(680px, calc(100vh - 120px));
-  max-height: min(680px, calc(100vh - 120px));
+  height: min(680px, calc(100vh - 140px));
+  max-height: calc(100vh - 140px);
   background: #f5f1ea;
   border: 1px solid rgba(201, 169, 110, 0.35);
   border-radius: 22px;
@@ -364,6 +365,12 @@
     border-bottom: 0;
   }
 
+  @media (min-width: 769px) {
+    #arte-barista-panel {
+      bottom: 140px;
+      left: 24px;
+    }
+  }
   #arte-barista-header {
     padding: 14px 16px 12px;
   }
