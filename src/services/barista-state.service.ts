@@ -1,235 +1,131 @@
-export type BaristaIntent =
-  | "recommend_coffee"
-  | "brewing_guidance"
-  | "pairing"
-  | "cocktails"
-  | "subscription"
-  | "orders"
-  | "support"
-  | string;
+export type ConversationMode = "continue" | "new" | null;
+export type DrinkType = "coffee" | "cocktail" | "mocktail" | null;
 
-export interface ConversationState {
-  lastCoffee: string;
-  lastIntent: BaristaIntent | "";
-  lastUserMessage: string;
-  lastAssistantReply: string;
-  lastInteractionAt: string;
+export type BaristaState = {
+  activeTopic:
+    | "coffee_selection"
+    | "preparation"
+    | "pairing"
+    | "cocktail"
+    | "orders"
+    | "subscription"
+    | "education"
+    | "professional"
+    | "general"
+    | null;
+  activeCoffee: "catuai" | "geisha" | "pacamara" | null;
+  activeMethod: string | null;
+  tasteProfile: string | null;
+  pendingQuestion: string | null;
+
+  activeRecipe: string | null;
+  activeDrinkType: DrinkType;
+  lastUserGoal: string | null;
+  lastAssistantSummary: string | null;
+  conversationMode: ConversationMode;
+
+  updatedAt: string | null;
+};
+
+export const EMPTY_BARISTA_STATE: BaristaState = {
+  activeTopic: null,
+  activeCoffee: null,
+  activeMethod: null,
+  tasteProfile: null,
+  pendingQuestion: null,
+
+  activeRecipe: null,
+  activeDrinkType: null,
+  lastUserGoal: null,
+  lastAssistantSummary: null,
+  conversationMode: null,
+
+  updatedAt: null,
+};
+
+export function normalizeBaristaState(input?: Partial<BaristaState> | null): BaristaState {
+  return {
+    activeTopic: input?.activeTopic ?? null,
+    activeCoffee: input?.activeCoffee ?? null,
+    activeMethod: input?.activeMethod ?? null,
+    tasteProfile: input?.tasteProfile ?? null,
+    pendingQuestion: input?.pendingQuestion ?? null,
+
+    activeRecipe: input?.activeRecipe ?? null,
+    activeDrinkType: input?.activeDrinkType ?? null,
+    lastUserGoal: input?.lastUserGoal ?? null,
+    lastAssistantSummary: input?.lastAssistantSummary ?? null,
+    conversationMode: input?.conversationMode ?? null,
+
+    updatedAt: input?.updatedAt ?? null,
+  };
 }
 
-export interface BaristaUserState {
-  userId: string;
-  externalUserId: string;
-  createdAt: string;
-  updatedAt: string;
-  conversation: ConversationState;
+export function mergeBaristaState(
+  current: Partial<BaristaState> | null | undefined,
+  patch: Partial<BaristaState> | null | undefined
+): BaristaState {
+  const base = normalizeBaristaState(current);
+  const next = normalizeBaristaState({
+    ...base,
+    ...(patch || {}),
+    updatedAt: new Date().toISOString(),
+  });
+
+  return next;
 }
 
-export interface ResumeSnapshot {
-  resumeAvailable: boolean;
-  resumeSummary: string;
-  lastCoffee: string;
-  lastIntent: BaristaIntent | "";
-  lastUserMessage: string;
-  lastAssistantReply: string;
-  lastInteractionAt: string;
+export function hasMeaningfulState(state?: Partial<BaristaState> | null): boolean {
+  if (!state) return false;
+
+  return Boolean(
+    state.activeCoffee ||
+      state.activeTopic ||
+      state.activeMethod ||
+      state.tasteProfile ||
+      state.pendingQuestion ||
+      state.activeRecipe ||
+      state.activeDrinkType ||
+      state.lastUserGoal ||
+      state.lastAssistantSummary
+  );
 }
 
-type UpdateConversationInput = Partial<ConversationState>;
+export function summarizeStateForWelcome(state?: Partial<BaristaState> | null): string | null {
+  if (!state) return null;
 
-class BaristaStateService {
-  private usersByUserId = new Map<string, BaristaUserState>();
-  private userIdByExternalUserId = new Map<string, string>();
+  if (state.lastAssistantSummary) return state.lastAssistantSummary;
 
-  createOrGetUser(externalUserId: string): BaristaUserState {
-    const existingUserId = this.userIdByExternalUserId.get(externalUserId);
-
-    if (existingUserId) {
-      const existing = this.usersByUserId.get(existingUserId);
-      if (existing) {
-        return existing;
-      }
-    }
-
-    const now = new Date().toISOString();
-    const userId = this.generateUserId();
-
-    const user: BaristaUserState = {
-      userId,
-      externalUserId,
-      createdAt: now,
-      updatedAt: now,
-      conversation: this.emptyConversationState(),
-    };
-
-    this.usersByUserId.set(userId, user);
-    this.userIdByExternalUserId.set(externalUserId, userId);
-
-    return user;
+  if (state.activeRecipe && state.activeCoffee) {
+    return `La última vez estábamos con ${prettyCoffee(state.activeCoffee)} y una receta de ${state.activeRecipe}.`;
   }
 
-  getUserByUserId(userId: string): BaristaUserState | null {
-    return this.usersByUserId.get(userId) || null;
+  if (state.activeDrinkType === "cocktail" && state.activeCoffee) {
+    return `La última vez estábamos hablando de un cóctel con ${prettyCoffee(state.activeCoffee)}.`;
   }
 
-  getUserByExternalUserId(externalUserId: string): BaristaUserState | null {
-    const userId = this.userIdByExternalUserId.get(externalUserId);
-    if (!userId) return null;
-    return this.usersByUserId.get(userId) || null;
+  if (state.activeDrinkType === "mocktail" && state.activeCoffee) {
+    return `La última vez estábamos hablando de una propuesta sin alcohol con ${prettyCoffee(state.activeCoffee)}.`;
   }
 
-  updateConversationState(
-    userId: string,
-    payload: UpdateConversationInput
-  ): BaristaUserState | null {
-    const user = this.usersByUserId.get(userId);
-    if (!user) return null;
-
-    const nextConversation: ConversationState = {
-      ...user.conversation,
-      ...payload,
-      lastInteractionAt:
-        payload.lastInteractionAt || new Date().toISOString(),
-    };
-
-    const updated: BaristaUserState = {
-      ...user,
-      updatedAt: new Date().toISOString(),
-      conversation: nextConversation,
-    };
-
-    this.usersByUserId.set(userId, updated);
-    return updated;
+  if (state.activeTopic === "pairing" && state.activeCoffee) {
+    return `La última vez estábamos hablando de maridajes con ${prettyCoffee(state.activeCoffee)}.`;
   }
 
-  clearConversationState(userId: string): BaristaUserState | null {
-    const user = this.usersByUserId.get(userId);
-    if (!user) return null;
-
-    const updated: BaristaUserState = {
-      ...user,
-      updatedAt: new Date().toISOString(),
-      conversation: this.emptyConversationState(),
-    };
-
-    this.usersByUserId.set(userId, updated);
-    return updated;
+  if (state.activeTopic === "preparation" && state.activeCoffee) {
+    return `La última vez estábamos viendo cómo preparar ${prettyCoffee(state.activeCoffee)}.`;
   }
 
-  getResumeSnapshot(userId: string): ResumeSnapshot {
-    const user = this.usersByUserId.get(userId);
-
-    if (!user) {
-      return this.emptyResumeSnapshot();
-    }
-
-    const c = user.conversation;
-    const hasContext =
-      !!c.lastInteractionAt &&
-      (!!c.lastCoffee ||
-        !!c.lastIntent ||
-        !!c.lastUserMessage ||
-        !!c.lastAssistantReply);
-
-    if (!hasContext) {
-      return {
-        resumeAvailable: false,
-        resumeSummary: "",
-        lastCoffee: "",
-        lastIntent: "",
-        lastUserMessage: "",
-        lastAssistantReply: "",
-        lastInteractionAt: "",
-      };
-    }
-
-    return {
-      resumeAvailable: true,
-      resumeSummary: this.buildResumeSummary(c),
-      lastCoffee: c.lastCoffee,
-      lastIntent: c.lastIntent,
-      lastUserMessage: c.lastUserMessage,
-      lastAssistantReply: c.lastAssistantReply,
-      lastInteractionAt: c.lastInteractionAt,
-    };
+  if (state.activeCoffee) {
+    return `La última vez estuvimos hablando de ${prettyCoffee(state.activeCoffee)}.`;
   }
 
-  private buildResumeSummary(conversation: ConversationState): string {
-    const coffee = this.friendlyCoffee(conversation.lastCoffee);
-    const intent = this.friendlyIntent(conversation.lastIntent);
-
-    if (coffee && intent) {
-      return `${coffee} y ${intent}`;
-    }
-
-    if (coffee) {
-      return coffee;
-    }
-
-    if (intent) {
-      return intent;
-    }
-
-    if (conversation.lastUserMessage) {
-      return `"${conversation.lastUserMessage}"`;
-    }
-
-    return "tu consulta anterior";
-  }
-
-  private friendlyCoffee(name: string): string {
-    const value = String(name || "").trim();
-    if (!value) return "";
-
-    const lower = value.toLowerCase();
-
-    if (lower.includes("geisha")) return "Geisha";
-    if (lower.includes("pacamara")) return "Pacamara";
-    if (lower.includes("catuai")) return "Catuai";
-
-    return value;
-  }
-
-  private friendlyIntent(intent: BaristaIntent | ""): string {
-    const map: Record<string, string> = {
-      recommend_coffee: "la selección del café",
-      brewing_guidance: "la preparación",
-      pairing: "el maridaje",
-      cocktails: "la coctelería con café",
-      subscription: "las suscripciones",
-      orders: "los pedidos",
-      support: "una consulta de soporte",
-    };
-
-    return intent ? map[intent] || intent : "";
-  }
-
-  private emptyConversationState(): ConversationState {
-    return {
-      lastCoffee: "",
-      lastIntent: "",
-      lastUserMessage: "",
-      lastAssistantReply: "",
-      lastInteractionAt: "",
-    };
-  }
-
-  private emptyResumeSnapshot(): ResumeSnapshot {
-    return {
-      resumeAvailable: false,
-      resumeSummary: "",
-      lastCoffee: "",
-      lastIntent: "",
-      lastUserMessage: "",
-      lastAssistantReply: "",
-      lastInteractionAt: "",
-    };
-  }
-
-  private generateUserId(): string {
-    return `barista_${Math.random().toString(36).slice(2, 10)}${Date.now()
-      .toString(36)
-      .slice(-4)}`;
-  }
+  return null;
 }
 
-export const baristaStateService = new BaristaStateService();
+function prettyCoffee(coffee: string): string {
+  if (coffee === "catuai") return "Catuai";
+  if (coffee === "geisha") return "Geisha";
+  if (coffee === "pacamara") return "Pacamara";
+  return coffee;
+}

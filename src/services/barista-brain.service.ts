@@ -1,34 +1,10 @@
 import OpenAI from "openai";
 import { arteCoffees, coffeeKnowledge } from "./barista-knowledge.service";
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-
-if (!OPENAI_API_KEY) {
-  throw new Error("Falta OPENAI_API_KEY en el archivo .env");
-}
+import type { BaristaState } from "./barista-state.service";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-export type BrainState = {
-  userType?: "consumer" | "professional" | "unknown";
-  activeTopic?:
-    | "coffee_selection"
-    | "preparation"
-    | "pairing"
-    | "cocktail"
-    | "orders"
-    | "subscription"
-    | "education"
-    | "professional"
-    | "general";
-  activeCoffee?: "catuai" | "geisha" | "pacamara";
-  activeMethod?: string;
-  tasteProfile?: string;
-  pendingQuestion?: string;
-  goals?: string[];
-};
 
 export type BrainResult = {
   reply: string;
@@ -40,7 +16,7 @@ export type BrainResult = {
     image?: string;
     url: string;
   };
-  updateState?: Partial<BrainState>;
+  updateState?: Partial<BaristaState>;
 };
 
 function buildKnowledgeContext() {
@@ -60,63 +36,57 @@ CONOCIMIENTO GENERAL DE CAFÉ
 `.trim();
 }
 
-function buildSystemPrompt(state: BrainState) {
+function buildSystemPrompt(state: BaristaState) {
   return `
 Eres el barista oficial de Arte Coffee.
 
-Tu forma de hablar:
-- elegante
-- natural
-- precisa
-- serena
-- profesional
-- nada robótica
-- nada vulgar
-- nunca hablas como FAQ, formulario o asistente mecánico
+Hablas con elegancia, naturalidad, precisión y calidez profesional.
+Nunca suenas robótico.
+Nunca usas etiquetas técnicas internas en tus respuestas.
+Nunca enseñas nombres de variables, intents ni identificadores del sistema.
 
 Tu misión:
-- mantener una conversación racional y fluida
-- recordar el contexto inmediato
-- responder como un barista experto real
-- ayudar en selección de café, preparación, maridaje, coctelería, suscripciones, pedidos, incidencias y consultas profesionales
+- mantener una conversación coherente y continua
+- recordar el contexto real de la conversación
+- resolver selección de café, preparación, maridaje, coctelería, recetas, pedidos, suscripciones y consultas profesionales
 - combinar conocimiento general del café con conocimiento específico de Arte Coffee
 
 Reglas:
-- si el usuario ya ha hablado de un café concreto, úsalo como contexto
-- si el usuario dice "prepararlo", "acompañarlo", "maridarlo" o similares, interpreta el pronombre con el contexto anterior
-- no repitas preguntas innecesarias
-- si falta una precisión, haz solo una pregunta útil
-- si la intención del usuario está clara, responde directamente
-- no ofrezcas listas tipo A/B/C salvo que sea imprescindible
-- no uses tono comercial agresivo
-- no inventes datos de pedido o estado de pedido
-- si te piden estado de pedido, solicita número de pedido o email
-- si recomiendas un café de Arte Coffee, elige entre: catuai, geisha, pacamara
-- cuando recomiendes uno, explica por qué encaja
-- NO repitas la recomendación del producto si el café activo no ha cambiado, salvo que sea necesario
-- cada respuesta debe cerrar con una continuación natural del diálogo
-- nunca termines seco; deja abierta una siguiente ayuda concreta y profesional
-- actúa como alguien que quiere resolver de verdad la consulta del usuario
-- si el usuario menciona un método concreto (por ejemplo prensa francesa, V60, espresso, Chemex), intégralo en la respuesta sin perder el hilo de la conversación
-- si el usuario pide preparación y ya existe un café activo, responde sobre ese café activo
-- si el usuario cambia claramente de objetivo, adapta la conversación al nuevo objetivo sin perder coherencia
+- si el usuario ya viene de un café activo, úsalo como contexto por defecto
+- si el usuario usa pronombres como "ese", "este", "prepararlo", "acompañarlo", interpreta el contexto previo
+- si el usuario corrige, ajusta sin empezar desde cero
+- si el usuario pide una variante, mantén el hilo y cambia solo lo necesario
+- si el usuario pide receta, recuerda si veníais de cóctel, mocktail, preparación o postre
+- si el usuario pide imagen, sé honesto: no digas que ya la has generado si no existe una imagen real devuelta por el sistema
+- no repitas la ficha del producto si el café activo sigue siendo el mismo
+- no hagas preguntas innecesarias
+- si falta una precisión, haz una sola pregunta útil
+- cada respuesta debe sonar humana y dejar una continuación natural
+- no inventes estados de pedido
+- si piden estado de pedido, solicita email o número de pedido
+- si recomiendas un café, elige solo entre catuai, geisha, pacamara
 
 Estado actual de conversación:
 ${JSON.stringify(state, null, 2)}
 
 ${buildKnowledgeContext()}
 
-Debes devolver SIEMPRE un JSON válido con esta forma exacta:
+Devuelve SIEMPRE JSON válido exacto con esta forma:
 {
   "intent": "string",
   "reply": "string",
   "recommendedProductHandle": "catuai | geisha | pacamara | null",
   "updateState": {
-    "activeTopic": "string o null",
+    "activeTopic": "string | null",
     "activeCoffee": "catuai | geisha | pacamara | null",
-    "activeMethod": "string o null",
-    "tasteProfile": "string o null",
-    "pendingQuestion": "string o null"
+    "activeMethod": "string | null",
+    "tasteProfile": "string | null",
+    "pendingQuestion": "string | null",
+    "activeRecipe": "string | null",
+    "activeDrinkType": "coffee | cocktail | mocktail | null",
+    "lastUserGoal": "string | null",
+    "lastAssistantSummary": "string | null",
+    "conversationMode": "continue | new | null"
   }
 }
 `.trim();
@@ -124,6 +94,7 @@ Debes devolver SIEMPRE un JSON válido con esta forma exacta:
 
 function mapHandleToProduct(handle: string | null) {
   if (!handle) return undefined;
+
   const coffee = (arteCoffees as Record<string, any>)[handle];
   if (!coffee) return undefined;
 
@@ -138,7 +109,7 @@ function mapHandleToProduct(handle: string | null) {
 
 export async function baristaBrain(
   message: string,
-  state: BrainState
+  state: BaristaState
 ): Promise<BrainResult> {
   const response = await client.responses.create({
     model: "gpt-4.1-mini",
@@ -178,6 +149,17 @@ export async function baristaBrain(
                 activeMethod: { type: ["string", "null"] },
                 tasteProfile: { type: ["string", "null"] },
                 pendingQuestion: { type: ["string", "null"] },
+                activeRecipe: { type: ["string", "null"] },
+                activeDrinkType: {
+                  type: ["string", "null"],
+                  enum: ["coffee", "cocktail", "mocktail", null],
+                },
+                lastUserGoal: { type: ["string", "null"] },
+                lastAssistantSummary: { type: ["string", "null"] },
+                conversationMode: {
+                  type: ["string", "null"],
+                  enum: ["continue", "new", null],
+                },
               },
               required: [
                 "activeTopic",
@@ -185,6 +167,11 @@ export async function baristaBrain(
                 "activeMethod",
                 "tasteProfile",
                 "pendingQuestion",
+                "activeRecipe",
+                "activeDrinkType",
+                "lastUserGoal",
+                "lastAssistantSummary",
+                "conversationMode",
               ],
             },
           },
@@ -199,14 +186,12 @@ export async function baristaBrain(
     },
   });
 
-  const raw = response.output_text;
-  const parsed = JSON.parse(raw);
+  const parsed = JSON.parse(response.output_text);
 
   const stateCoffee = state.activeCoffee || null;
   const recommendedHandle = parsed.recommendedProductHandle || null;
-
   const shouldReturnProduct =
-    recommendedHandle && recommendedHandle !== stateCoffee;
+    Boolean(recommendedHandle) && recommendedHandle !== stateCoffee;
 
   return {
     intent: parsed.intent || "general",
