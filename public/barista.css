@@ -9,8 +9,8 @@
   left: 24px;
   right: auto;
   bottom: 28px;
-  width: 72px;
-  height: 72px;
+  width: 66px;
+  height: 66px;
   border: 1px solid rgba(201, 169, 110, 0.45);
   border-radius: 999px;
   background: radial-gradient(circle at 30% 30%, #2a241d 0%, #171310 70%, #0f0c09 100%);
@@ -31,16 +31,17 @@
 }
 
 #arte-barista-button img {
-  width: 42px;
-  height: 42px;
+  width: 52px;
+  height: 52px;
   object-fit: contain;
+  object-position: center
   opacity: 1;
   display: block;
 }
 
 #arte-barista-button-label {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
@@ -55,6 +56,7 @@
   text-transform: uppercase;
   line-height: 1;
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  z-index: 1;
 }
 
 #arte-barista-panel {
@@ -100,9 +102,9 @@
 }
 
 #arte-barista-brand-mark {
-  width: 52px;
-  height: 52px;
-  min-width: 52px;
+  width: 50px;
+  height: 50px;
+  min-width: 50px;
   border-radius: 999px;
   background: radial-gradient(circle at 30% 30%, #2a241d 0%, #171310 70%, #0f0c09 100%);
   border: 1px solid rgba(201, 169, 110, 0.35);
@@ -113,9 +115,10 @@
 }
 
 #arte-barista-brand-mark img {
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
+  object-position: center;
   opacity: 1;
   display: block;
 }
@@ -381,13 +384,18 @@
   #arte-barista-button {
     left: 14px;
     bottom: 20px;
-    width: 62px;
-    height: 62px;
+    width: 58px;
+    height: 58px;
   }
 
   #arte-barista-button img {
-    width: 36px;
-    height: 36px;
+    width: 46px;
+    height: 46px;
+  }
+  #arte-barista-button-label {
+    top: calc(100% - 10px);
+    font-size: 10px;
+    padding: 6px 12px;
   }
 
   #arte-barista-panel {
