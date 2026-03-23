@@ -6,11 +6,12 @@
 
 #arte-barista-button {
   position: fixed;
-  left: 20px;
-  bottom: 34px;
-  width: 74px;
-  height: 74px;
-  border: 1px solid rgba(201, 169, 110, 0.55);
+  left: 24px;
+  right: auto;
+  bottom: 120px;
+  width: 72px;
+  height: 72px;
+  border: 1px solid rgba(201, 169, 110, 0.45);
   border-radius: 999px;
   background: radial-gradient(circle at 30% 30%, #2a241d 0%, #171310 70%, #0f0c09 100%);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
@@ -21,7 +22,7 @@
   z-index: 9998;
   padding: 0;
   overflow: visible;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 #arte-barista-button:hover {
@@ -30,43 +31,44 @@
 }
 
 #arte-barista-button img {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   object-fit: contain;
   opacity: 0.98;
+  display: block;
 }
 
-#arte-barista-button::after {
-  content: "TU BARISTA";
+#arte-barista-button-label {
   position: absolute;
+  top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  top: calc(100% + 8px);
-  white-space: nowrap;
-  font-size: 11px;
-  line-height: 1;
-  letter-spacing: 0.08em;
-  font-weight: 700;
-  color: #ffffff;
-  background: rgba(17, 17, 17, 0.96);
-  border: 1px solid rgba(201, 169, 110, 0.28);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 14px;
   border-radius: 999px;
-  padding: 7px 10px 6px;
-}
-
-#arte-barista-button.is-hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(8px);
+  background: #111111;
+  color: #ffffff;
+  border: 1px solid rgba(201, 169, 110, 0.38);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 #arte-barista-panel {
   position: fixed;
-  left: 20px;
-  bottom: 122px;
-  width: 420px;
-  max-width: calc(100vw - 40px);
-  height: min(620px, calc(100vh - 150px));
+  left: 24px;
+  right: auto;
+  bottom: 220px;
+  width: 430px;
+  max-width: min(430px, calc(100vw - 48px));
+  height: min(680px, calc(100vh - 120px));
+  max-height: min(680px, calc(100vh - 120px));
   background: #f5f1ea;
   border: 1px solid rgba(201, 169, 110, 0.35);
   border-radius: 22px;
@@ -113,10 +115,11 @@
 }
 
 #arte-barista-brand-mark img {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   object-fit: contain;
   opacity: 0.98;
+  display: block;
 }
 
 #arte-barista-brand-copy {
@@ -154,6 +157,7 @@
   overflow-y: auto;
   padding: 16px;
   background: #f5f1ea;
+  -webkit-overflow-scrolling: touch;
 }
 
 #arte-barista-input-wrap {
@@ -181,15 +185,16 @@
 
 .arte-msg {
   display: flex;
+  flex-direction: column;
   margin-bottom: 14px;
 }
 
 .arte-msg-assistant {
-  justify-content: flex-start;
+  align-items: flex-start;
 }
 
 .arte-msg-user {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 
 .arte-bubble {
@@ -199,6 +204,7 @@
   font-size: 15px;
   line-height: 1.55;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+  word-break: break-word;
 }
 
 .arte-msg-assistant .arte-bubble {
@@ -220,12 +226,15 @@
   overflow: hidden;
   width: 100%;
   max-width: 84%;
+  align-self: flex-start;
+  box-sizing: border-box;
 }
 
 .arte-card-hero {
   display: flex;
   gap: 14px;
   padding: 14px 14px 10px;
+  align-items: flex-start;
 }
 
 .arte-card-image {
@@ -235,12 +244,14 @@
   border-radius: 14px;
   overflow: hidden;
   background: #f2ece4;
+  flex: 0 0 84px;
 }
 
 .arte-card-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .arte-card-kicker {
@@ -264,10 +275,15 @@
   gap: 8px;
 }
 
+.arte-card-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .arte-chip {
   display: inline-flex;
   align-items: center;
-  height: 28px;
+  min-height: 28px;
   padding: 0 10px;
   border: 1px solid rgba(201, 169, 110, 0.28);
   border-radius: 999px;
@@ -313,45 +329,54 @@
 @media (max-width: 768px) {
   #arte-barista-button {
     left: 16px;
-    bottom: 36px;
+    right: auto;
+    bottom: 110px;
     width: 64px;
     height: 64px;
   }
 
   #arte-barista-button img {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
   }
 
-  #arte-barista-button::after {
-    font-size: 10px;
-    top: calc(100% + 6px);
-    padding: 6px 9px 5px;
+  #arte-barista-button-label {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    top: calc(100% + 8px);
+    margin-top: 0;
+    font-size: 11px;
+    letter-spacing: 0.08em;
   }
 
   #arte-barista-panel {
-    left: 12px;
-    right: 12px;
-    bottom: 108px;
-    width: auto;
-    max-width: none;
-    height: min(68vh, 620px);
-    border-radius: 22px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    max-width: 100vw;
+    height: 78vh;
+    max-height: 78vh;
+    border-radius: 22px 22px 0 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
   }
 
   #arte-barista-header {
-    padding: 16px;
+    padding: 14px 16px 12px;
   }
 
   #arte-barista-brand-mark {
-    width: 46px;
-    height: 46px;
-    min-width: 46px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
   }
 
   #arte-barista-brand-mark img {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
   }
 
   #arte-barista-header-title {
@@ -360,64 +385,114 @@
 
   #arte-barista-header-subtitle {
     font-size: 11px;
+    line-height: 1.25;
   }
 
   #arte-barista-messages {
-    padding: 14px;
+    padding: 14px 12px;
   }
 
-  #arte-barista-button::after {
-    top: calc(100% + 5px);
+  #arte-barista-input-wrap {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: #f5f1ea;
+  }
+
+  #arte-barista-input {
+    height: 48px;
+    font-size: 16px;
   }
 
   .arte-bubble,
   .arte-card {
-    max-width: 92%;
+    max-width: 100%;
+  }
+
+  .arte-card {
+    width: 100%;
+    margin-top: 10px;
+  }
+
+  .arte-card-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .arte-card-image {
+    width: 100%;
+    height: 180px;
+    min-width: 100%;
+    border-radius: 14px;
+    flex: none;
+  }
+
+  .arte-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .arte-card-body {
+    padding: 0 14px 14px;
+  }
+
+  .arte-card-actions {
+    flex-direction: column;
+  }
+
+  .arte-card-actions a {
+    width: 100%;
   }
 }
 
 @media (max-width: 480px) {
   #arte-barista-button {
     left: 14px;
-    bottom: 30px;
+    bottom: 106px;
     width: 60px;
     height: 60px;
   }
 
   #arte-barista-button img {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
   }
 
   #arte-barista-panel {
-    left: 10px;
-    right: 10px;
-    bottom: 102px;
-    height: 66vh;
-    border-radius: 20px;
+    height: 76vh;
+    max-height: 76vh;
+    border-radius: 20px 20px 0 0;
   }
 
   #arte-barista-header {
-    padding: 14px 14px 12px;
+    padding: 12px 14px 10px;
+  }
+
+  #arte-barista-messages {
+    padding: 12px 10px;
   }
 
   #arte-barista-input-wrap {
-    padding: 10px;
-  }
-
-  #arte-barista-input {
-    height: 46px;
-    font-size: 14px;
-  }
-
-  #arte-barista-button::after {
-    top: calc(100% + 4px);
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
   }
 
   .arte-bubble {
     font-size: 14px;
     line-height: 1.5;
+    padding: 14px;
   }
 
-}
+  .arte-card-title {
+    font-size: 17px;
+  }
 
+  .arte-card-text {
+    font-size: 14px;
+  }
+
+  .arte-chip {
+    font-size: 12px;
+  }
+}

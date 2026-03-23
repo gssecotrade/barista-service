@@ -261,71 +261,76 @@
   function appendAssistantMessage(text, product, showProductCard = false) {
     const wrapper = document.createElement("div");
     wrapper.className = "arte-msg arte-msg-assistant";
-
-    let html = `<div class="arte-bubble">${formatText(text)}</div>`;
-
+  
+    const bubble = document.createElement("div");
+    bubble.className = "arte-bubble";
+    bubble.innerHTML = formatText(cleanAssistantText(text));
+  
+    wrapper.appendChild(bubble);
+  
     if (product && showProductCard) {
       const safeImage = escapeHtml(product.image || "");
       const safeName = escapeHtml(product.name || "");
       const safeReason = escapeHtml(product.reason || "");
       const safeUrl = escapeHtml(product.url || "#");
       const safeHandle = escapeHtml(product.handle || "");
-
-      html += `
-        <div class="arte-card">
-          <div class="arte-card-hero">
-            ${
-              safeImage
-                ? `<div class="arte-card-image">
-                     <img src="${safeImage}" alt="${safeName}" onerror="this.closest('.arte-card-image').style.display='none'" />
-                   </div>`
-                : ""
-            }
-            <div>
-              <div class="arte-card-kicker">Selección recomendada</div>
-              <div class="arte-card-title">${safeName}</div>
-              <div class="arte-card-chips">${buildProductChips(product)}</div>
-            </div>
+  
+      const card = document.createElement("div");
+      card.className = "arte-card";
+  
+      card.innerHTML = `
+        <div class="arte-card-hero">
+          ${
+            safeImage
+              ? `<div class="arte-card-image">
+                   <img src="${safeImage}" alt="${safeName}" onerror="this.closest('.arte-card-image').style.display='none'" />
+                 </div>`
+              : ""
+          }
+          <div class="arte-card-main">
+            <div class="arte-card-kicker">Selección recomendada</div>
+            <div class="arte-card-title">${safeName}</div>
+            <div class="arte-card-chips">${buildProductChips(product)}</div>
           </div>
-          <div class="arte-card-body">
-            <div class="arte-card-text">${safeReason}</div>
-            <div class="arte-card-actions">
-              <a
-                href="${safeUrl}"
-                target="_blank"
-                rel="noopener noreferrer"
-                data-product-click="true"
-                data-product-handle="${safeHandle}"
-              >Descubrir este café</a>
-            </div>
+        </div>
+        <div class="arte-card-body">
+          <div class="arte-card-text">${safeReason}</div>
+          <div class="arte-card-actions">
+            <a
+              href="${safeUrl}"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-product-click="true"
+              data-product-handle="${safeHandle}"
+            >Descubrir este café</a>
           </div>
         </div>
       `;
-    }
-
-    wrapper.innerHTML = html;
-    messagesEl().appendChild(wrapper);
-
-    wrapper.querySelectorAll("[data-product-click='true']").forEach((link) => {
-      link.addEventListener("click", async function () {
-        try {
-          const currentSession = await ensureSession();
-
-          await fetch(`${API_BASE}/track`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId: currentSession.userId,
-              type: "product_clicked",
-              meta: {
-                handle: this.getAttribute("data-product-handle") || "",
-              },
-            }),
-          });
-        } catch (e) {}
+  
+      wrapper.appendChild(card);
+  
+      card.querySelectorAll("[data-product-click='true']").forEach((link) => {
+        link.addEventListener("click", async function () {
+          try {
+            const currentSession = await ensureSession();
+  
+            await fetch(`${API_BASE}/track`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: currentSession.userId,
+                type: "product_clicked",
+                meta: {
+                  handle: this.getAttribute("data-product-handle") || "",
+                },
+              }),
+            });
+          } catch (e) {}
+        });
       });
-    });
-
+    }
+  
+    messagesEl().appendChild(wrapper);
     scrollToBottom();
   }
 
@@ -360,6 +365,15 @@
       .replaceAll("'", "&#039;");
   }
 
+  function cleanAssistantText(str) {
+    return String(str)
+      .replaceAll("continue_cocktail_discussion", "la conversación anterior")
+      .replaceAll("continue_pairing_discussion", "la conversación anterior")
+      .replaceAll("continue_preparation_discussion", "la conversación anterior")
+      .replaceAll("continue_selection_discussion", "la conversación anterior")
+      .replaceAll("preparar_postre_con_cafe", "preparar un postre con café");
+  }
+  
   function formatText(str) {
     return escapeHtml(String(str)).replace(/\n/g, "<br>");
   }
