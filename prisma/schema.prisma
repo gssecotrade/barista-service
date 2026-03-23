@@ -7,35 +7,57 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id                String       @id @default(cuid())
-  externalUserId    String       @unique
+model BaristaUser {
+  id                String           @id @default(cuid())
+  externalUserId    String           @unique
   shopifyCustomerId String?
   email             String?
-  firstSeenAt       DateTime     @default(now())
-  lastSeenAt        DateTime     @updatedAt
+  firstSeenAt       DateTime         @default(now())
+  lastSeenAt        DateTime         @updatedAt
   conversationId    String?
   profileSummary    String?
-  messages          Message[]
-  preferences       Preference[]
+
+  profile           BaristaProfile?
+  messages          BaristaMessage[]
+  preferences       BaristaPreference[]
+
+  @@map("User")
 }
 
-model Message {
-  id        String   @id @default(cuid())
+model BaristaProfile {
+  id             String      @id @default(cuid())
+  userId         String      @unique
+  lastIntent     String?
+  favoriteCoffee String?
+  preferences    Json?
+  state          Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user           BaristaUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BaristaMessage {
+  id        String      @id @default(cuid())
   userId    String
   role      String
   content   String
-  createdAt DateTime @default(now())
+  meta      Json?
+  createdAt DateTime    @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      BaristaUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("Message")
 }
 
-model Preference {
-  id        String   @id @default(cuid())
+model BaristaPreference {
+  id        String      @id @default(cuid())
   userId    String
   key       String
   value     String
-  createdAt DateTime @default(now())
+  createdAt DateTime    @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      BaristaUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("Preference")
 }
