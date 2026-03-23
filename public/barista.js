@@ -3,7 +3,7 @@
     (window.ARTE_BARISTA_CONFIG && window.ARTE_BARISTA_CONFIG.apiBase) ||
     "https://barista.arte-coffee.com";
 
-  const LOGO_MONOGRAM_SRC = "/public/arte-coffee-monogram-white.png";
+  const LOGO_MONOGRAM_SRC = "https://barista.arte-coffee.com/public/arte-coffee-monogram-white.png?v=300";
   const STORAGE_KEY = "arte_barista_ui_state_v5";
   const USER_KEY = "arte_barista_external_user_id";
   const SESSION_KEY = "arte_barista_session_cache_v1";

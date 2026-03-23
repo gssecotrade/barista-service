@@ -31,10 +31,10 @@
 }
 
 #arte-barista-button img {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   object-fit: contain;
-  opacity: 0.98;
+  opacity: 1;
   display: block;
 }
 
@@ -43,21 +43,18 @@
   top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 30px;
-  padding: 0 14px;
+  white-space: nowrap;
+  padding: 7px 14px;
   border-radius: 999px;
+  border: 1px solid rgba(201, 169, 110, 0.35);
   background: #111111;
-  color: #ffffff;
-  border: 1px solid rgba(201, 169, 110, 0.38);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
-  font-size: 11px;
+  color: #f8f4ee;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  white-space: nowrap;
+  line-height: 1;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
 }
 
 #arte-barista-panel {
@@ -65,11 +62,10 @@
   left: 24px;
   right: auto;
   bottom: 118px;
-  top: auto;
   width: 430px;
-  max-width: min(430px, calc(100vw - 48px));
-  height: min(640px, calc(100vh - 150px));
-  max-height: calc(100vh - 150px);
+  max-width: calc(100vw - 48px);
+  height: 520px;
+  max-height: calc(100vh - 120px);
   background: #f5f1ea;
   border: 1px solid rgba(201, 169, 110, 0.35);
   border-radius: 22px;
@@ -82,6 +78,7 @@
 
 #arte-barista-header {
   flex: 0 0 auto;
+  min-height: 88px;
   background: linear-gradient(135deg, #16120f 0%, #241b15 100%);
   color: #f8f4ee;
   padding: 18px 18px 16px;
@@ -116,10 +113,10 @@
 }
 
 #arte-barista-brand-mark img {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   object-fit: contain;
-  opacity: 0.98;
+  opacity: 1;
   display: block;
 }
 
@@ -158,7 +155,6 @@
   overflow-y: auto;
   padding: 16px;
   background: #f5f1ea;
-  -webkit-overflow-scrolling: touch;
 }
 
 #arte-barista-input-wrap {
@@ -205,7 +201,6 @@
   font-size: 15px;
   line-height: 1.55;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
-  word-break: break-word;
 }
 
 .arte-msg-assistant .arte-bubble {
@@ -227,15 +222,12 @@
   overflow: hidden;
   width: 100%;
   max-width: 84%;
-  align-self: flex-start;
-  box-sizing: border-box;
 }
 
 .arte-card-hero {
   display: flex;
   gap: 14px;
   padding: 14px 14px 10px;
-  align-items: flex-start;
 }
 
 .arte-card-image {
@@ -245,14 +237,12 @@
   border-radius: 14px;
   overflow: hidden;
   background: #f2ece4;
-  flex: 0 0 84px;
 }
 
 .arte-card-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
 }
 
 .arte-card-kicker {
@@ -276,15 +266,10 @@
   gap: 8px;
 }
 
-.arte-card-main {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
 .arte-chip {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
+  height: 28px;
   padding: 0 10px;
   border: 1px solid rgba(201, 169, 110, 0.28);
   border-radius: 999px;
@@ -327,28 +312,23 @@
   color: #ffffff;
 }
 
+/* TABLET / MOBILE */
 @media (max-width: 768px) {
   #arte-barista-button {
     left: 16px;
-    right: auto;
-    bottom: 110px;
-    width: 64px;
-    height: 64px;
+    bottom: 22px;
+    width: 66px;
+    height: 66px;
   }
 
   #arte-barista-button img {
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 38px;
   }
 
   #arte-barista-button-label {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    top: calc(100% + 8px);
-    margin-top: 0;
     font-size: 11px;
-    letter-spacing: 0.08em;
+    padding: 6px 12px;
   }
 
   #arte-barista-panel {
@@ -360,35 +340,22 @@
     height: 78vh;
     max-height: 78vh;
     border-radius: 22px 22px 0 0;
-    border-left: 0;
-    border-right: 0;
-    border-bottom: 0;
   }
 
-  @media (min-width: 769px) {
-    #arte-barista-button {
-      bottom: 28px;
-      left: 24px;
-    }
-  
-    #arte-barista-panel {
-      bottom: 118px;
-      left: 24px;
-    }
-  }
   #arte-barista-header {
-    padding: 14px 16px 12px;
+    min-height: 86px;
+    padding: 16px;
   }
 
   #arte-barista-brand-mark {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
   }
 
   #arte-barista-brand-mark img {
-    width: 22px;
-    height: 22px;
+    width: 28px;
+    height: 28px;
   }
 
   #arte-barista-header-title {
@@ -397,79 +364,30 @@
 
   #arte-barista-header-subtitle {
     font-size: 11px;
-    line-height: 1.25;
   }
 
   #arte-barista-messages {
-    padding: 14px 12px;
-  }
-
-  #arte-barista-input-wrap {
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-    background: #f5f1ea;
-  }
-
-  #arte-barista-input {
-    height: 48px;
-    font-size: 16px;
+    padding: 14px;
   }
 
   .arte-bubble,
   .arte-card {
-    max-width: 100%;
-  }
-
-  .arte-card {
-    width: 100%;
-    margin-top: 10px;
-  }
-
-  .arte-card-hero {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 14px;
-  }
-
-  .arte-card-image {
-    width: 100%;
-    height: 180px;
-    min-width: 100%;
-    border-radius: 14px;
-    flex: none;
-  }
-
-  .arte-card-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .arte-card-body {
-    padding: 0 14px 14px;
-  }
-
-  .arte-card-actions {
-    flex-direction: column;
-  }
-
-  .arte-card-actions a {
-    width: 100%;
+    max-width: 92%;
   }
 }
 
+/* MOBILE PEQUEÑO */
 @media (max-width: 480px) {
   #arte-barista-button {
     left: 14px;
-    bottom: 106px;
-    width: 60px;
-    height: 60px;
+    bottom: 20px;
+    width: 62px;
+    height: 62px;
   }
 
   #arte-barista-button img {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
   }
 
   #arte-barista-panel {
@@ -479,32 +397,20 @@
   }
 
   #arte-barista-header {
-    padding: 12px 14px 10px;
-  }
-
-  #arte-barista-messages {
-    padding: 12px 10px;
+    padding: 14px 14px 12px;
   }
 
   #arte-barista-input-wrap {
-    padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+    padding: 10px;
+  }
+
+  #arte-barista-input {
+    height: 46px;
+    font-size: 14px;
   }
 
   .arte-bubble {
     font-size: 14px;
     line-height: 1.5;
-    padding: 14px;
-  }
-
-  .arte-card-title {
-    font-size: 17px;
-  }
-
-  .arte-card-text {
-    font-size: 14px;
-  }
-
-  .arte-chip {
-    font-size: 12px;
   }
 }
