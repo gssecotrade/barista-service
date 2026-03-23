@@ -1,202 +1,166 @@
 import OpenAI from "openai";
-import { arteCoffees, coffeeKnowledge } from "./barista-knowledge.service";
-import type { BaristaState } from "./barista-state.service";
 
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY!,
 });
 
-export type BrainResult = {
-  reply: string;
-  intent: string;
-  product?: {
-    handle: string;
-    name: string;
-    reason: string;
-    image?: string;
-    url: string;
-  };
-  updateState?: Partial<BaristaState>;
+type BaristaContext = {
+  lastCoffee?: string;
+  lastIntent?: string;
+  lastStyle?: string;
+  summary?: string;
 };
 
-function buildKnowledgeContext() {
-  return `
-CONOCIMIENTO ARTE COFFEE
-- Catuai: ${arteCoffees.catuai.profile}. Ideal para: ${arteCoffees.catuai.ideal}.
-- Geisha: ${arteCoffees.geisha.profile}. Ideal para: ${arteCoffees.geisha.ideal}.
-- Pacamara: ${arteCoffees.pacamara.profile}. Ideal para: ${arteCoffees.pacamara.ideal}.
+export async function generateBaristaResponse({
+  userMessage,
+  history = [],
+  context,
+}: {
+  userMessage: string;
+  history: { role: string; content: string }[];
+  context?: BaristaContext;
+}) {
+  const systemPrompt = `
+Eres "Tu Barista" de Arte Coffee.
 
-CONOCIMIENTO GENERAL DE CAFÉ
-- V60: ${coffeeKnowledge.methods.v60}
-- Cafetera francesa: ${coffeeKnowledge.methods.french_press}
-- Espresso: ${coffeeKnowledge.methods.espresso}
-- Chemex: ${coffeeKnowledge.methods.chemex}
-- Molienda: ${coffeeKnowledge.tips.grind}
-- Agua: ${coffeeKnowledge.tips.water}
-`.trim();
-}
+No eres un chatbot. Eres un barista experto y consultor gastronómico premium.
 
-function buildSystemPrompt(state: BaristaState) {
-  return `
-Eres el barista oficial de Arte Coffee.
+Tu objetivo:
+- ayudar
+- recomendar con criterio
+- crear experiencias
+- elevar el nivel del cliente (no responder básico)
 
-Hablas con elegancia, naturalidad, precisión y calidez profesional.
-Nunca suenas robótico.
-Nunca usas etiquetas técnicas internas en tus respuestas.
-Nunca enseñas nombres de variables, intents ni identificadores del sistema.
+---
 
-Tu misión:
-- mantener una conversación coherente y continua
-- recordar el contexto real de la conversación
-- resolver selección de café, preparación, maridaje, coctelería, recetas, pedidos, suscripciones y consultas profesionales
-- combinar conocimiento general del café con conocimiento específico de Arte Coffee
+🔵 ESTILO
+- elegante pero cercano
+- claro, sin tecnicismos innecesarios
+- sin listas largas salvo que aporten valor
+- tono experto, no comercial agresivo
 
-Reglas:
-- si el usuario ya viene de un café activo, úsalo como contexto por defecto
-- si el usuario usa pronombres como "ese", "este", "prepararlo", "acompañarlo", interpreta el contexto previo
-- si el usuario corrige, ajusta sin empezar desde cero
-- si el usuario pide una variante, mantén el hilo y cambia solo lo necesario
-- si el usuario pide receta, recuerda si veníais de cóctel, mocktail, preparación o postre
-- si el usuario pide imagen, sé honesto: no digas que ya la has generado si no existe una imagen real devuelta por el sistema
-- no repitas la ficha del producto si el café activo sigue siendo el mismo
-- no hagas preguntas innecesarias
-- si falta una precisión, haz una sola pregunta útil
-- cada respuesta debe sonar humana y dejar una continuación natural
-- no inventes estados de pedido
-- si piden estado de pedido, solicita email o número de pedido
-- si recomiendas un café, elige solo entre catuai, geisha, pacamara
+---
 
-Estado actual de conversación:
-${JSON.stringify(state, null, 2)}
+🔵 CAPACIDADES
+Puedes:
+- recomendar cafés (Catuai, Pacamara, Geisha)
+- proponer maridajes
+- crear recetas (casa o profesional)
+- diseñar propuestas para restaurantes
+- sugerir experiencias gastronómicas
+- adaptar a momento (mañana, sobremesa, noche, temporada)
 
-${buildKnowledgeContext()}
+---
 
-Devuelve SIEMPRE JSON válido exacto con esta forma:
-{
-  "intent": "string",
-  "reply": "string",
-  "recommendedProductHandle": "catuai | geisha | pacamara | null",
-  "updateState": {
-    "activeTopic": "string | null",
-    "activeCoffee": "catuai | geisha | pacamara | null",
-    "activeMethod": "string | null",
-    "tasteProfile": "string | null",
-    "pendingQuestion": "string | null",
-    "activeRecipe": "string | null",
-    "activeDrinkType": "coffee | cocktail | mocktail | null",
-    "lastUserGoal": "string | null",
-    "lastAssistantSummary": "string | null",
-    "conversationMode": "continue | new | null"
-  }
-}
-`.trim();
-}
+🔵 INTELIGENCIA CLAVE
 
-function mapHandleToProduct(handle: string | null) {
-  if (!handle) return undefined;
+ANTES DE RESPONDER:
+1. Detecta intención del usuario:
+   - compra
+   - recomendación
+   - receta
+   - maridaje
+   - experiencia gastronómica
+   - profesional/horeca
+   - continuidad conversación
 
-  const coffee = (arteCoffees as Record<string, any>)[handle];
-  if (!coffee) return undefined;
+2. Detecta nivel:
+   - usuario casa
+   - foodie
+   - profesional
 
-  return {
-    handle,
-    name: coffee.name,
-    reason: `${coffee.profile}. Ideal para ${coffee.ideal.toLowerCase()}.`,
-    image: coffee.image,
-    url: coffee.url ?? `https://arte-coffee.com/products/${handle}`,
-  };
-}
+3. Detecta contexto:
+   - postre
+   - bebida
+   - cóctel
+   - momento del día
+   - temporada
 
-export async function baristaBrain(
-  message: string,
-  state: BaristaState
-): Promise<BrainResult> {
-  const response = await client.responses.create({
-    model: "gpt-4.1-mini",
-    input: [
-      {
-        role: "system",
-        content: buildSystemPrompt(state),
-      },
-      {
-        role: "user",
-        content: message,
-      },
-    ],
-    text: {
-      format: {
-        type: "json_schema",
-        name: "barista_response",
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            intent: { type: "string" },
-            reply: { type: "string" },
-            recommendedProductHandle: {
-              type: ["string", "null"],
-              enum: ["catuai", "geisha", "pacamara", null],
-            },
-            updateState: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                activeTopic: { type: ["string", "null"] },
-                activeCoffee: {
-                  type: ["string", "null"],
-                  enum: ["catuai", "geisha", "pacamara", null],
-                },
-                activeMethod: { type: ["string", "null"] },
-                tasteProfile: { type: ["string", "null"] },
-                pendingQuestion: { type: ["string", "null"] },
-                activeRecipe: { type: ["string", "null"] },
-                activeDrinkType: {
-                  type: ["string", "null"],
-                  enum: ["coffee", "cocktail", "mocktail", null],
-                },
-                lastUserGoal: { type: ["string", "null"] },
-                lastAssistantSummary: { type: ["string", "null"] },
-                conversationMode: {
-                  type: ["string", "null"],
-                  enum: ["continue", "new", null],
-                },
-              },
-              required: [
-                "activeTopic",
-                "activeCoffee",
-                "activeMethod",
-                "tasteProfile",
-                "pendingQuestion",
-                "activeRecipe",
-                "activeDrinkType",
-                "lastUserGoal",
-                "lastAssistantSummary",
-                "conversationMode",
-              ],
-            },
-          },
-          required: [
-            "intent",
-            "reply",
-            "recommendedProductHandle",
-            "updateState",
-          ],
-        },
-      },
-    },
+---
+
+🔵 REGLAS IMPORTANTES
+
+- NO inventes productos fuera de Arte Coffee
+- NO respondas genérico
+- SIEMPRE aporta criterio (por qué)
+- SI el usuario es ambiguo → decide tú con inteligencia
+
+---
+
+🔵 NIVEL PREMIUM
+
+Cuando el usuario pida algo como:
+"qué harías con..."
+"qué recomiendas con..."
+"quiero algo especial..."
+
+NO des una respuesta básica.
+
+Debes:
+- crear algo diferencial
+- proponer una idea con personalidad
+- explicar el porqué
+- elevar la experiencia
+
+Ejemplo correcto:
+→ propuesta de postre + café + lógica gastronómica
+
+---
+
+🔵 TEMPORADA
+
+Si aplica (ej: torrijas, verano, sobremesa):
+incorpora el contexto sin que el usuario lo pida.
+
+---
+
+🔵 CONTINUIDAD
+
+Si hay contexto previo:
+úsalo de forma natural, sin mostrar variables técnicas.
+
+---
+
+🔵 PROHIBIDO
+
+- "como asistente"
+- respuestas genéricas tipo blog
+- listas aburridas sin criterio
+- repetir lo que dice el usuario
+
+---
+
+Contexto previo:
+${context?.summary || "sin contexto"}
+
+Último café:
+${context?.lastCoffee || "no definido"}
+`;
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...history.slice(-10),
+    { role: "user", content: userMessage },
+  ];
+
+  const completion = await client.chat.completions.create({
+    model: "gpt-5.3",
+    messages,
+    temperature: 0.7,
   });
 
-  const parsed = JSON.parse(response.output_text);
-
-  const stateCoffee = state.activeCoffee || null;
-  const recommendedHandle = parsed.recommendedProductHandle || null;
-  const shouldReturnProduct =
-    Boolean(recommendedHandle) && recommendedHandle !== stateCoffee;
+  const reply = completion.choices[0].message.content || "";
 
   return {
-    intent: parsed.intent || "general",
-    reply: parsed.reply || "No he podido responder correctamente.",
-    product: shouldReturnProduct ? mapHandleToProduct(recommendedHandle) : undefined,
-    updateState: parsed.updateState || {},
+    reply,
+    updatedContext: {
+      ...context,
+      summary: generateSummary([...history, { role: "user", content: userMessage }]),
+    },
   };
+}
+
+function generateSummary(messages: { role: string; content: string }[]) {
+  const last = messages.slice(-6).map((m) => m.content).join(" ");
+  return last.slice(0, 300);
 }

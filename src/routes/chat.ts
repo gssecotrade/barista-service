@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 import { prisma } from "../db/prisma";
-import { baristaBrain } from "../services/barista-brain.service";
+import { generateBaristaResponse } from "../services/barista-brain.service";
 import {
   EMPTY_BARISTA_STATE,
   mergeBaristaState,
@@ -64,6 +64,14 @@ export async function chatRoutes(app: FastifyInstance) {
         mapIntentToTopic(context?.lastIntent ?? null),
     });
 
+    const history = user.messages
+      .slice()
+      .reverse()
+      .map((msg) => ({
+        role: msg.role === "assistant" ? "assistant" : "user",
+        content: msg.content,
+      }));
+
     await prisma.baristaMessage.create({
       data: {
         userId,
@@ -75,18 +83,62 @@ export async function chatRoutes(app: FastifyInstance) {
       },
     });
 
-    const brain = await baristaBrain(message, mergedInputState);
+    const { reply: baristaReply, updatedContext } = await generateBaristaResponse({
+      userMessage: message,
+      history,
+      context: {
+        lastCoffee: mergedInputState.activeCoffee ?? undefined,
+        lastIntent: mergedInputState.activeTopic ?? undefined,
+        lastStyle: mergedInputState.activeDrinkType ?? undefined,
+        summary:
+          mergedInputState.lastAssistantSummary ??
+          buildFriendlySummary(mergedInputState),
+      },
+    });
 
-    const nextState = mergeBaristaState(mergedInputState, brain.updateState);
+    const inferredCoffee = inferCoffeeFromText(
+      `${message} ${baristaReply} ${mergedInputState.lastCoffee ?? ""}`
+    );
+
+    const inferredTopic = inferTopicFromText(
+      `${message} ${baristaReply} ${mergedInputState.activeTopic ?? ""}`
+    );
+
+    const inferredDrinkType = inferDrinkTypeFromText(
+      `${message} ${baristaReply} ${mergedInputState.activeDrinkType ?? ""}`
+    );
+
+    const inferredRecipe = inferRecipeFromText(baristaReply);
+    const inferredProduct = mapCoffeeToProduct(inferredCoffee, baristaReply);
+
+    const nextState = mergeBaristaState(mergedInputState, {
+      activeCoffee: inferredCoffee ?? mergedInputState.activeCoffee,
+      activeTopic: inferredTopic ?? mergedInputState.activeTopic,
+      activeDrinkType: inferredDrinkType ?? mergedInputState.activeDrinkType,
+      activeRecipe: inferredRecipe ?? mergedInputState.activeRecipe,
+      lastUserGoal: message,
+      lastAssistantSummary:
+        buildAssistantSummary({
+          coffee: inferredCoffee ?? mergedInputState.activeCoffee,
+          topic: inferredTopic ?? mergedInputState.activeTopic,
+          recipe: inferredRecipe ?? mergedInputState.activeRecipe,
+          drinkType: inferredDrinkType ?? mergedInputState.activeDrinkType,
+          reply: baristaReply,
+        }) ?? updatedContext?.summary ?? mergedInputState.lastAssistantSummary,
+      conversationMode: "continue",
+    });
 
     await prisma.baristaMessage.create({
       data: {
         userId,
         role: "assistant",
-        content: brain.reply,
+        content: baristaReply,
         meta: {
-          intent: brain.intent,
-          product: brain.product ?? null,
+          topic: nextState.activeTopic,
+          coffee: nextState.activeCoffee,
+          recipe: nextState.activeRecipe,
+          drinkType: nextState.activeDrinkType,
+          product: inferredProduct ?? null,
         },
       },
     });
@@ -95,7 +147,7 @@ export async function chatRoutes(app: FastifyInstance) {
       await prisma.baristaProfile.update({
         where: { id: user.profile.id },
         data: {
-          lastIntent: brain.intent,
+          lastIntent: nextState.activeTopic ?? "general",
           favoriteCoffee:
             nextState.activeCoffee ?? user.profile.favoriteCoffee ?? null,
           preferences: {
@@ -117,7 +169,7 @@ export async function chatRoutes(app: FastifyInstance) {
       await prisma.baristaProfile.create({
         data: {
           userId,
-          lastIntent: brain.intent,
+          lastIntent: nextState.activeTopic ?? "general",
           favoriteCoffee: nextState.activeCoffee,
           preferences: {
             activeMethod: nextState.activeMethod,
@@ -135,15 +187,17 @@ export async function chatRoutes(app: FastifyInstance) {
 
     return reply.send({
       ok: true,
-      reply: brain.reply,
-      intent: brain.intent,
-      product: brain.product ?? null,
+      reply: baristaReply,
+      intent: nextState.activeTopic ?? "general",
+      product: inferredProduct ?? null,
       state: nextState,
     });
   });
 }
 
-function mapCoffeeFromContext(value: string | null): "catuai" | "geisha" | "pacamara" | null {
+function mapCoffeeFromContext(
+  value: string | null
+): "catuai" | "geisha" | "pacamara" | null {
   if (!value) return null;
 
   const normalized = value.toLowerCase().trim();
@@ -155,7 +209,7 @@ function mapCoffeeFromContext(value: string | null): "catuai" | "geisha" | "paca
   return null;
 }
 
-function mapIntentToTopic(value: string | null): string | null {
+function mapIntentToTopic(value: string | null): BaristaTopic | null {
   if (!value) return null;
 
   const normalized = value.toLowerCase().trim();
@@ -169,6 +223,285 @@ function mapIntentToTopic(value: string | null): string | null {
   if (normalized.includes("select")) return "coffee_selection";
 
   return "general";
+}
+
+type BaristaTopic =
+  | "coffee_selection"
+  | "preparation"
+  | "pairing"
+  | "cocktail"
+  | "orders"
+  | "subscription"
+  | "education"
+  | "professional"
+  | "general";
+
+function inferCoffeeFromText(
+  value: string
+): "catuai" | "geisha" | "pacamara" | null {
+  const normalized = value.toLowerCase();
+
+  if (normalized.includes("geisha")) return "geisha";
+  if (normalized.includes("pacamara")) return "pacamara";
+  if (normalized.includes("catuai")) return "catuai";
+
+  return null;
+}
+
+function inferTopicFromText(value: string): BaristaTopic | null {
+  const normalized = value.toLowerCase();
+
+  if (
+    normalized.includes("marid") ||
+    normalized.includes("postre") ||
+    normalized.includes("acompa")
+  ) {
+    return "pairing";
+  }
+
+  if (
+    normalized.includes("prepar") ||
+    normalized.includes("v60") ||
+    normalized.includes("chemex") ||
+    normalized.includes("espresso") ||
+    normalized.includes("cafetera")
+  ) {
+    return "preparation";
+  }
+
+  if (
+    normalized.includes("cóctel") ||
+    normalized.includes("cocktail") ||
+    normalized.includes("mocktail") ||
+    normalized.includes("sin alcohol")
+  ) {
+    return "cocktail";
+  }
+
+  if (
+    normalized.includes("comprar") ||
+    normalized.includes("pedido") ||
+    normalized.includes("encargar")
+  ) {
+    return "orders";
+  }
+
+  if (
+    normalized.includes("suscrip") ||
+    normalized.includes("club")
+  ) {
+    return "subscription";
+  }
+
+  if (
+    normalized.includes("restaurante") ||
+    normalized.includes("local") ||
+    normalized.includes("carta") ||
+    normalized.includes("negocio") ||
+    normalized.includes("horeca")
+  ) {
+    return "professional";
+  }
+
+  if (
+    normalized.includes("recom") ||
+    normalized.includes("qué café") ||
+    normalized.includes("que café") ||
+    normalized.includes("café ideal") ||
+    normalized.includes("cafe ideal")
+  ) {
+    return "coffee_selection";
+  }
+
+  return "general";
+}
+
+function inferDrinkTypeFromText(
+  value: string
+): "coffee" | "cocktail" | "mocktail" | null {
+  const normalized = value.toLowerCase();
+
+  if (normalized.includes("sin alcohol") || normalized.includes("mocktail")) {
+    return "mocktail";
+  }
+
+  if (normalized.includes("cóctel") || normalized.includes("cocktail")) {
+    return "cocktail";
+  }
+
+  if (
+    normalized.includes("espresso") ||
+    normalized.includes("v60") ||
+    normalized.includes("chemex") ||
+    normalized.includes("cafetera") ||
+    normalized.includes("café") ||
+    normalized.includes("cafe")
+  ) {
+    return "coffee";
+  }
+
+  return null;
+}
+
+function inferRecipeFromText(value: string): string | null {
+  const normalized = value.toLowerCase();
+
+  if (normalized.includes("torrija")) return "torrija signature";
+  if (normalized.includes("affogato")) return "affogato";
+  if (normalized.includes("tiramisú") || normalized.includes("tiramisu"))
+    return "tiramisú";
+  if (normalized.includes("brownie")) return "brownie";
+  if (normalized.includes("postre")) return "postre de la casa";
+  if (normalized.includes("cóctel de café") || normalized.includes("cocktail"))
+    return "cóctel de café";
+  if (normalized.includes("receta")) return "receta signature";
+
+  return null;
+}
+
+function mapCoffeeToProduct(
+  coffee: "catuai" | "geisha" | "pacamara" | null,
+  reply: string
+) {
+  if (!coffee) return null;
+
+  const catalog = {
+    catuai: {
+      handle: "catuai",
+      name: "Catuai",
+      reason:
+        "Perfil equilibrado y versátil, ideal para quienes buscan un café accesible pero con profundidad.",
+      image:
+        "https://arte-coffee.com/cdn/shop/files/Catuai_Lavado.jpg?v=1747402022",
+      url: "https://arte-coffee.com/products/catuai",
+    },
+    geisha: {
+      handle: "geisha",
+      name: "Geisha",
+      reason:
+        "Un café elegante y floral, pensado para experiencias más delicadas y sofisticadas.",
+      image:
+        "https://arte-coffee.com/cdn/shop/files/Geisha_Lavado.jpg?v=1747402022",
+      url: "https://arte-coffee.com/products/geisha",
+    },
+    pacamara: {
+      handle: "pacamara",
+      name: "Pacamara",
+      reason:
+        "Más estructura y complejidad en boca, ideal para propuestas gastronómicas y sobremesas con carácter.",
+      image:
+        "https://arte-coffee.com/cdn/shop/files/Pacamara_Natural.jpg?v=1747402022",
+      url: "https://arte-coffee.com/products/pacamara",
+    },
+  } as const;
+
+  const item = catalog[coffee];
+
+  return {
+    ...item,
+    reason: item.reason,
+  };
+}
+
+function buildFriendlySummary(
+  state: ReturnType<typeof normalizeBaristaState>
+): string {
+  if (state.lastAssistantSummary) return state.lastAssistantSummary;
+
+  if (state.activeRecipe && state.activeCoffee) {
+    return `La última vez estábamos con ${prettyCoffee(
+      state.activeCoffee
+    )} y una propuesta en torno a ${state.activeRecipe}.`;
+  }
+
+  if (state.activeTopic === "pairing" && state.activeCoffee) {
+    return `La última vez estábamos trabajando maridajes con ${prettyCoffee(
+      state.activeCoffee
+    )}.`;
+  }
+
+  if (state.activeTopic === "preparation" && state.activeCoffee) {
+    return `La última vez estábamos viendo cómo preparar ${prettyCoffee(
+      state.activeCoffee
+    )}.`;
+  }
+
+  if (state.activeTopic === "cocktail" && state.activeCoffee) {
+    return `La última vez estábamos explorando una propuesta con ${prettyCoffee(
+      state.activeCoffee
+    )}.`;
+  }
+
+  if (state.activeCoffee) {
+    return `La última vez estuvimos hablando de ${prettyCoffee(
+      state.activeCoffee
+    )}.`;
+  }
+
+  return "La última vez estuvimos viendo una propuesta de café.";
+}
+
+function buildAssistantSummary({
+  coffee,
+  topic,
+  recipe,
+  drinkType,
+  reply,
+}: {
+  coffee: "catuai" | "geisha" | "pacamara" | null;
+  topic: BaristaTopic | null;
+  recipe: string | null;
+  drinkType: "coffee" | "cocktail" | "mocktail" | null;
+  reply: string;
+}): string {
+  if (recipe && coffee) {
+    return `La última vez estábamos con ${prettyCoffee(
+      coffee
+    )} y una propuesta en torno a ${recipe}.`;
+  }
+
+  if (drinkType === "mocktail" && coffee) {
+    return `La última vez estábamos trabajando una propuesta sin alcohol con ${prettyCoffee(
+      coffee
+    )}.`;
+  }
+
+  if (drinkType === "cocktail" && coffee) {
+    return `La última vez estábamos trabajando un cóctel con ${prettyCoffee(
+      coffee
+    )}.`;
+  }
+
+  if (topic === "pairing" && coffee) {
+    return `La última vez estábamos viendo maridajes con ${prettyCoffee(
+      coffee
+    )}.`;
+  }
+
+  if (topic === "preparation" && coffee) {
+    return `La última vez estábamos viendo cómo preparar ${prettyCoffee(
+      coffee
+    )}.`;
+  }
+
+  if (topic === "professional" && coffee) {
+    return `La última vez estábamos trabajando una propuesta para negocio con ${prettyCoffee(
+      coffee
+    )}.`;
+  }
+
+  if (coffee) {
+    return `La última vez estuvimos hablando de ${prettyCoffee(coffee)}.`;
+  }
+
+  return reply.slice(0, 180);
+}
+
+function prettyCoffee(coffee: string): string {
+  if (coffee === "catuai") return "Catuai";
+  if (coffee === "geisha") return "Geisha";
+  if (coffee === "pacamara") return "Pacamara";
+  return coffee;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
