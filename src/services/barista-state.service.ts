@@ -129,3 +129,10 @@ function prettyCoffee(coffee: string): string {
   if (coffee === "pacamara") return "Pacamara";
   return coffee;
 }
+
+export const baristaStateService = {
+  normalizeBaristaState,
+  mergeBaristaState,
+  hasMeaningfulState,
+  summarizeStateForWelcome,
+};
