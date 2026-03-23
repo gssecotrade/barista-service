@@ -8,7 +8,7 @@
   position: fixed;
   left: 24px;
   right: auto;
-  bottom: 120px;
+  bottom: 28px;
   width: 72px;
   height: 72px;
   border: 1px solid rgba(201, 169, 110, 0.45);
@@ -64,12 +64,12 @@
   position: fixed;
   left: 24px;
   right: auto;
-  bottom: 220px;
+  bottom: 118px;
   top: auto;
   width: 430px;
   max-width: min(430px, calc(100vw - 48px));
-  height: min(680px, calc(100vh - 140px));
-  max-height: calc(100vh - 140px);
+  height: min(640px, calc(100vh - 150px));
+  max-height: calc(100vh - 150px);
   background: #f5f1ea;
   border: 1px solid rgba(201, 169, 110, 0.35);
   border-radius: 22px;
@@ -366,8 +366,13 @@
   }
 
   @media (min-width: 769px) {
+    #arte-barista-button {
+      bottom: 28px;
+      left: 24px;
+    }
+  
     #arte-barista-panel {
-      bottom: 140px;
+      bottom: 118px;
       left: 24px;
     }
   }
