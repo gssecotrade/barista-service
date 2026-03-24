@@ -1,58 +1,86 @@
 import { FastifyInstance } from "fastify";
-import { baristaStateService } from "../services/barista-state.service";
+import { z } from "zod";
+
+import { prisma } from "../db/prisma";
+import {
+  EMPTY_BARISTA_STATE,
+  normalizeBaristaState,
+  summarizeStateForWelcome,
+} from "../services/barista-state.service";
+
+const sessionBodySchema = z.object({
+  externalUserId: z.string().min(1),
+  shopifyCustomerId: z.string().optional().nullable(),
+  email: z.string().email().optional().nullable(),
+});
 
 export async function sessionRoutes(app: FastifyInstance) {
   app.post("/session", async (request, reply) => {
-    const { externalUserId } = request.body as {
-      externalUserId: string;
-    };
+    const parsed = sessionBodySchema.safeParse(request.body);
 
-    if (!externalUserId) {
+    if (!parsed.success) {
       return reply.status(400).send({
-        error: "externalUserId es requerido",
+        error: "invalid_body",
+        details: parsed.error.flatten(),
       });
     }
 
-    const user = baristaStateService.createOrGetUser(externalUserId);
-    const resume = baristaStateService.getResumeSnapshot(user.userId);
+    const { externalUserId, shopifyCustomerId, email } = parsed.data;
 
-    const greeting = resume.resumeAvailable
-      ? "Bienvenido de nuevo."
-      : "Bienvenido a Arte Coffee.";
-
-    return reply.send({
-      userId: user.userId,
-      externalUserId: user.externalUserId,
-      greeting,
-      resumeAvailable: resume.resumeAvailable,
-      resumeSummary: resume.resumeSummary,
-      lastCoffee: resume.lastCoffee,
-      lastIntent: resume.lastIntent,
-      lastUserMessage: resume.lastUserMessage,
-      lastAssistantReply: resume.lastAssistantReply,
-      lastInteractionAt: resume.lastInteractionAt,
+    let user = await prisma.baristaUser.findUnique({
+      where: { externalUserId },
+      include: {
+        profile: true,
+      },
     });
-  });
-
-  app.post("/session/reset", async (request, reply) => {
-    const { userId } = request.body as {
-      userId: string;
-    };
-
-    if (!userId) {
-      return reply.status(400).send({
-        error: "userId es requerido",
-      });
-    }
-
-    const user = baristaStateService.clearConversationState(userId);
 
     if (!user) {
-      return reply.status(404).send({
-        error: "Usuario no encontrado",
+      user = await prisma.baristaUser.create({
+        data: {
+          externalUserId,
+          shopifyCustomerId: shopifyCustomerId ?? null,
+          email: email ?? null,
+          profile: {
+            create: {
+              state: EMPTY_BARISTA_STATE,
+              preferences: {},
+            },
+          },
+        },
+        include: {
+          profile: true,
+        },
+      });
+    } else {
+      user = await prisma.baristaUser.update({
+        where: { id: user.id },
+        data: {
+          shopifyCustomerId: shopifyCustomerId ?? user.shopifyCustomerId ?? null,
+          email: email ?? user.email ?? null,
+        },
+        include: {
+          profile: true,
+        },
       });
     }
 
-    return reply.send({ ok: true });
+    const state = normalizeBaristaState(
+      (user.profile?.state as Record<string, unknown> | null) ?? EMPTY_BARISTA_STATE
+    );
+
+    const welcomeBackSummary = summarizeStateForWelcome(state);
+
+    return reply.send({
+      ok: true,
+      userId: user.id,
+      profile: {
+        favoriteCoffee: user.profile?.favoriteCoffee ?? null,
+        lastIntent: user.profile?.lastIntent ?? null,
+        preferences: user.profile?.preferences ?? {},
+      },
+      state,
+      welcomeBack: Boolean(welcomeBackSummary),
+      welcomeBackSummary,
+    });
   });
 }
