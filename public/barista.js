@@ -231,11 +231,13 @@
     wrapper.appendChild(bubble);
 
     if (product && showProductCard) {
-      const safeImage = escapeHtml(product.image || "");
-      const safeName = escapeHtml(product.name || "");
-      const safeReason = escapeHtml(product.reason || "");
-      const safeUrl = escapeHtml(product.url || "#");
-      const safeHandle = escapeHtml(product.handle || "");
+    const safeImage = escapeHtml(product.image || "");
+    const safeName = escapeHtml(product.name || "");
+    const safeReason = escapeHtml(product.reason || "");
+    const safeUrl = escapeHtml(product.url || "#");
+    const safeHandle = escapeHtml(product.handle || "");
+    const safeCtaLabel = escapeHtml(getContextualCtaLabel(product));
+    const safeCtaTitle = escapeHtml(getContextualCtaTitle(product));
 
       const card = document.createElement("div");
       card.className = "arte-card";
@@ -262,9 +264,10 @@
               href="${safeUrl}"
               target="_blank"
               rel="noopener noreferrer"
+              title="${safeCtaTitle}"
               data-product-click="true"
               data-product-handle="${safeHandle}"
-            >Descubrir este café</a>
+            >${safeCtaLabel}</a>
           </div>
         </div>
       `;
@@ -454,6 +457,86 @@ Mientras vuelve, dime: ¿te apetece algo más suave, más intenso o algo especia
     return `Estoy teniendo un pequeño problema técnico. Dame unos segundos y lo retomamos.
 
 Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial para este momento?`;
+  }
+  
+  function getContextualCtaLabel(product) {
+    const lastIntent = String(conversationState?.lastIntent || "").toLowerCase();
+    const lastCoffee = String(conversationState?.lastCoffee || "").toLowerCase();
+    const handle = String(product?.handle || "").toLowerCase();
+  
+    if (
+      lastIntent.includes("professional") ||
+      lastIntent.includes("local") ||
+      lastIntent.includes("negocio") ||
+      lastIntent.includes("carta")
+    ) {
+      return "Ver café recomendado para carta";
+    }
+  
+    if (
+      lastIntent.includes("pair") ||
+      lastIntent.includes("marid") ||
+      lastIntent.includes("postre") ||
+      lastIntent.includes("recipe") ||
+      lastIntent.includes("receta")
+    ) {
+      return "Ver café para esta propuesta";
+    }
+  
+    if (
+      lastIntent.includes("cocktail") ||
+      lastIntent.includes("mocktail") ||
+      lastIntent.includes("sin alcohol")
+    ) {
+      return "Ver café para esta creación";
+    }
+  
+    if (
+      lastIntent.includes("order") ||
+      lastIntent.includes("compra") ||
+      lastIntent.includes("subscription")
+    ) {
+      return "Probar esta referencia";
+    }
+  
+    if (handle && lastCoffee && handle.includes(lastCoffee)) {
+      return "Descubrir esta referencia";
+    }
+  
+    return "Descubrir este café";
+  }
+  
+  function getContextualCtaTitle(product) {
+    const lastIntent = String(conversationState?.lastIntent || "").toLowerCase();
+  
+    if (
+      lastIntent.includes("professional") ||
+      lastIntent.includes("local") ||
+      lastIntent.includes("negocio") ||
+      lastIntent.includes("carta")
+    ) {
+      return "Abrir la referencia recomendada para esta propuesta de carta";
+    }
+  
+    if (
+      lastIntent.includes("pair") ||
+      lastIntent.includes("marid") ||
+      lastIntent.includes("postre") ||
+      lastIntent.includes("recipe") ||
+      lastIntent.includes("receta")
+    ) {
+      return "Abrir el café recomendado para este maridaje o receta";
+    }
+  
+    if (
+      lastIntent.includes("cocktail") ||
+      lastIntent.includes("mocktail") ||
+      lastIntent.includes("sin alcohol")
+    ) {
+      return "Abrir el café recomendado para esta elaboración";
+    }
+  
+    return "Abrir el café recomendado";
   }
 
   async function sendMessage(message) {
