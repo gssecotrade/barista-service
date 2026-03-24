@@ -3,7 +3,8 @@
     (window.ARTE_BARISTA_CONFIG && window.ARTE_BARISTA_CONFIG.apiBase) ||
     "https://barista.arte-coffee.com";
 
-  const LOGO_MONOGRAM_SRC = "https://barista.arte-coffee.com/public/arte-coffee-monogram-white.png?v=300";
+  const LOGO_MONOGRAM_SRC =
+    "https://barista.arte-coffee.com/public/arte-coffee-monogram-white.png?v=300";
   const STORAGE_KEY = "arte_barista_ui_state_v5";
   const USER_KEY = "arte_barista_external_user_id";
   const SESSION_KEY = "arte_barista_session_cache_v1";
@@ -100,7 +101,9 @@
     document.body.appendChild(panel);
 
     button.addEventListener("click", openPanel);
-    document.getElementById("arte-barista-close").addEventListener("click", closePanel);
+    document
+      .getElementById("arte-barista-close")
+      .addEventListener("click", closePanel);
 
     const input = document.getElementById("arte-barista-input");
     input.addEventListener("keydown", async function (e) {
@@ -126,7 +129,7 @@
       const currentSession = await ensureSession(true);
       removeLoading();
       renderWelcomeView(currentSession);
-    } catch (e) {
+    } catch {
       removeLoading();
       renderWelcomeView(null);
     }
@@ -146,14 +149,12 @@
   function renderWelcomeView(currentSession) {
     const backendSummary =
       currentSession &&
-      currentSession.profile &&
-      currentSession.profile.state &&
-      typeof currentSession.profile.state.lastAssistantSummary === "string"
-        ? currentSession.profile.state.lastAssistantSummary
+      currentSession.state &&
+      typeof currentSession.state.lastAssistantSummary === "string"
+        ? currentSession.state.lastAssistantSummary
         : "";
 
     const localSummary = conversationState.lastSummary || "";
-
     const summary = backendSummary || localSummary;
 
     if (summary) {
@@ -199,7 +200,9 @@
           conversationState.lastCoffee = "";
           saveState();
           appendUserMessage("Nueva consulta");
-          appendAssistantMessage("Perfecto. Empezamos de nuevo.\n\n¿Qué te apetece resolver hoy?");
+          appendAssistantMessage(
+            "Perfecto. Empezamos de nuevo.\n\n¿Qué te apetece resolver hoy?"
+          );
         }
 
         wrapper.remove();
@@ -374,6 +377,9 @@
           externalUserId,
           userId: data.userId,
           profile: data.profile || null,
+          state: data.state || null,
+          welcomeBack: Boolean(data.welcomeBack),
+          welcomeBackSummary: data.welcomeBackSummary || "",
         });
         return session;
       })
@@ -382,6 +388,72 @@
       });
 
     return sessionPromise;
+  }
+
+  function getIntentLabel(intent) {
+    if (!intent) return null;
+
+    const normalized = String(intent).toLowerCase();
+
+    if (normalized.includes("pair")) return "maridaje";
+    if (normalized.includes("recipe")) return "receta";
+    if (normalized.includes("cocktail")) return "cóctel";
+    if (normalized.includes("mocktail")) return "propuesta sin alcohol";
+    if (normalized.includes("order")) return "compra";
+    if (normalized.includes("subscription")) return "suscripción";
+    if (normalized.includes("professional")) return "propuesta para tu local";
+    if (normalized.includes("select")) return "recomendación de café";
+    if (normalized.includes("prepar")) return "forma de preparación";
+
+    return "recomendación";
+  }
+
+  function prettyCoffeeName(coffee) {
+    if (!coffee) return null;
+
+    const normalized = String(coffee).toLowerCase();
+
+    if (normalized.includes("catuai")) return "Catuai";
+    if (normalized.includes("geisha")) return "Geisha";
+    if (normalized.includes("pacamara")) return "Pacamara";
+
+    return coffee;
+  }
+
+  function getSmartFallbackMessage() {
+    const lastIntent = getIntentLabel(conversationState.lastIntent);
+    const lastCoffee = prettyCoffeeName(conversationState.lastCoffee);
+    const lastSummary = conversationState.lastSummary
+      ? String(conversationState.lastSummary).trim()
+      : "";
+
+    if (lastIntent && lastCoffee) {
+      return `Estoy teniendo un pequeño problema técnico. Dame unos segundos y lo retomamos.
+
+Estábamos con una ${lastIntent} alrededor de ${lastCoffee}. Si quieres, dime si prefieres mantener esa línea o girar hacia algo más suave, más intenso o más especial para este momento.`;
+    }
+
+    if (lastIntent) {
+      return `Estoy teniendo un pequeño problema técnico. Dame unos segundos y lo retomamos.
+
+Estábamos trabajando una ${lastIntent}. Mientras vuelve, dime: ¿quieres que vayamos por una línea más clásica, más creativa o más gastronómica?`;
+    }
+
+    if (lastCoffee) {
+      return `Estoy teniendo un pequeño problema técnico. Dame unos segundos y lo retomamos.
+
+Seguíamos con ${lastCoffee}. Mientras tanto, dime si lo estás pensando para casa, para sobremesa o para una propuesta más especial.`;
+    }
+
+    if (lastSummary) {
+      return `Estoy teniendo un pequeño problema técnico. Dame unos segundos y lo retomamos.
+
+Mientras vuelve, dime: ¿te apetece algo más suave, más intenso o algo especial para este momento?`;
+    }
+
+    return `Estoy teniendo un pequeño problema técnico. Dame unos segundos y lo retomamos.
+
+Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial para este momento?`;
   }
 
   async function sendMessage(message) {
@@ -406,7 +478,7 @@
 
       if (!res.ok) {
         removeLoading();
-        appendAssistantMessage("Ha habido un problema de conexión. Inténtalo de nuevo en unos segundos.");
+        appendAssistantMessage(getSmartFallbackMessage());
         return;
       }
 
@@ -435,11 +507,15 @@
 
       if (session) {
         session.profile = session.profile || {};
-        session.profile.state = data.state || session.profile.state || null;
+        session.state = data.state || session.state || null;
+
         saveSessionCache({
           externalUserId,
           userId: session.userId,
           profile: session.profile,
+          state: session.state,
+          welcomeBack: true,
+          welcomeBackSummary: conversationState.lastSummary || "",
         });
       }
 
@@ -450,7 +526,7 @@
       );
     } catch {
       removeLoading();
-      appendAssistantMessage("Ha habido un problema de conexión. Inténtalo de nuevo en unos segundos.");
+      appendAssistantMessage(getSmartFallbackMessage());
     }
   }
 

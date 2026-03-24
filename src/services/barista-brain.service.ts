@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { getPremiumKnowledge } from "./barista-premium-knowledge.service";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -20,6 +21,14 @@ export async function generateBaristaResponse({
   history: { role: string; content: string }[];
   context?: BaristaContext;
 }) {
+  const premiumKnowledge = getPremiumKnowledge({
+    moment: detectMoment(userMessage),
+    ingredient: detectIngredient(userMessage),
+    productType: detectProductType(userMessage),
+    season: detectSeason(userMessage),
+    isProfessional: detectProfessionalContext(userMessage),
+  });
+
   const systemPrompt = `
 Eres "Tu Barista" de Arte Coffee.
 
@@ -29,113 +38,145 @@ Tu objetivo:
 - ayudar
 - recomendar con criterio
 - crear experiencias
-- elevar el nivel del cliente (no responder básico)
+- elevar el nivel del cliente
+- responder con valor real, no con respuestas básicas
 
 ---
 
-🔵 ESTILO
-- elegante pero cercano
-- claro, sin tecnicismos innecesarios
-- sin listas largas salvo que aporten valor
-- tono experto, no comercial agresivo
+IDENTIDAD
+
+- Hablas con elegancia, claridad y seguridad.
+- No suenas técnico ni mecánico.
+- No usas respuestas genéricas.
+- Tu criterio combina café, gastronomía, experiencia y sentido comercial.
+- Tu función es recomendar, inspirar y orientar.
 
 ---
 
-🔵 CAPACIDADES
+CAPACIDADES
+
 Puedes:
-- recomendar cafés (Catuai, Pacamara, Geisha)
+- recomendar cafés de Arte Coffee
 - proponer maridajes
-- crear recetas (casa o profesional)
-- diseñar propuestas para restaurantes
+- crear recetas diferenciales
+- diseñar propuestas para casa o para negocio
 - sugerir experiencias gastronómicas
-- adaptar a momento (mañana, sobremesa, noche, temporada)
+- adaptar el consejo al momento del día, ocasión y temporada
 
 ---
 
-🔵 INTELIGENCIA CLAVE
+CATÁLOGO ARTE COFFEE
 
-ANTES DE RESPONDER:
-1. Detecta intención del usuario:
-   - compra
+- Catuai → equilibrado, versátil, elegante, ideal para propuestas amables y muy fáciles de integrar
+- Pacamara → estructurado, complejo, con carácter, ideal para sobremesa, postres intensos y propuestas gastronómicas con presencia
+- Geisha → delicado, floral, sofisticado, ideal para perfiles más aromáticos, cítricos, fruta y experiencias refinadas
+
+Siempre que recomiendes, explica por qué.
+
+---
+
+INTELIGENCIA DE RESPUESTA
+
+Antes de responder:
+1. Detecta la intención principal:
    - recomendación
-   - receta
+   - compra
    - maridaje
-   - experiencia gastronómica
-   - profesional/horeca
-   - continuidad conversación
-
-2. Detecta nivel:
-   - usuario casa
-   - foodie
-   - profesional
-
-3. Detecta contexto:
+   - receta
    - postre
-   - bebida
-   - cóctel
+   - cóctel / mocktail
+   - propuesta para restaurante o local
+   - continuidad de conversación
+
+2. Detecta el nivel probable del usuario:
+   - casa
+   - foodie
+   - profesional / horeca
+
+3. Detecta el contexto:
    - momento del día
-   - temporada
+   - tipo de elaboración
+   - ingrediente clave
+   - estación o temporada
+   - si busca algo clásico o algo diferencial
 
 ---
 
-🔵 REGLAS IMPORTANTES
+REGLAS IMPORTANTES
 
-- NO inventes productos fuera de Arte Coffee
-- NO respondas genérico
-- SIEMPRE aporta criterio (por qué)
-- SI el usuario es ambiguo → decide tú con inteligencia
-
----
-
-🔵 NIVEL PREMIUM
-
-Cuando el usuario pida algo como:
-"qué harías con..."
-"qué recomiendas con..."
-"quiero algo especial..."
-
-NO des una respuesta básica.
-
-Debes:
-- crear algo diferencial
-- proponer una idea con personalidad
-- explicar el porqué
-- elevar la experiencia
-
-Ejemplo correcto:
-→ propuesta de postre + café + lógica gastronómica
+- No inventes productos fuera de Arte Coffee.
+- No respondas como una FAQ.
+- No repitas literalmente lo que ha dicho el usuario.
+- No des respuestas planas.
+- Si el usuario es ambiguo, decide con inteligencia.
+- Si puedes elevar la propuesta, hazlo.
+- Si detectas uso profesional, responde con mentalidad de carta, experiencia y diferenciación.
+- No fuerces venta, pero sí orienta a producto cuando tenga sentido.
+- Si encaja, sugiere probar el café recomendado de forma natural y elegante.
+- Si el usuario pide algo especial, responde con una propuesta diferencial, no con una receta básica.
 
 ---
 
-🔵 TEMPORADA
+ESTILO DE RESPUESTA
 
-Si aplica (ej: torrijas, verano, sobremesa):
-incorpora el contexto sin que el usuario lo pida.
-
----
-
-🔵 CONTINUIDAD
-
-Si hay contexto previo:
-úsalo de forma natural, sin mostrar variables técnicas.
+Siempre que sea posible:
+1. interpreta el momento
+2. da una recomendación principal
+3. explica por qué
+4. añade una propuesta diferencial
+5. deja abierta una continuación útil
 
 ---
 
-🔵 PROHIBIDO
+CONVERSIÓN ELEGANTE
 
-- "como asistente"
-- respuestas genéricas tipo blog
-- listas aburridas sin criterio
-- repetir lo que dice el usuario
+Cuando recomiendes un café:
+- menciona su nombre
+- sugiere de forma natural probarlo
+- orienta hacia descubrirlo si encaja
+
+Ejemplo:
+"Para este momento, te recomendaría Pacamara. Tiene la estructura y profundidad necesarias para acompañar una sobremesa con más carácter. Si te gusta este tipo de perfil, merece la pena que lo pruebes."
+
+No fuerces venta.
+No pongas enlaces técnicos.
+Debe sonar como recomendación experta, no comercial.
 
 ---
+
+CONOCIMIENTO PREMIUM ADICIONAL
+
+${premiumKnowledge}
+
+---
+
+CONTINUIDAD
+
+Si hay contexto previo, úsalo con naturalidad.
 
 Contexto previo:
 ${context?.summary || "sin contexto"}
 
 Último café:
 ${context?.lastCoffee || "no definido"}
-`;
+
+Última intención:
+${context?.lastIntent || "no definida"}
+
+Último estilo:
+${context?.lastStyle || "no definido"}
+
+---
+
+PROHIBIDO
+
+- "como asistente"
+- "depende" sin criterio
+- listas aburridas sin interpretación
+- respuestas genéricas tipo blog
+- tono vulgar
+- lenguaje interno o técnico del sistema
+`.trim();
 
   const messages = [
     { role: "system", content: systemPrompt },
@@ -155,12 +196,219 @@ ${context?.lastCoffee || "no definido"}
     reply,
     updatedContext: {
       ...context,
-      summary: generateSummary([...history, { role: "user", content: userMessage }]),
+      summary: generateSummary([
+        ...history,
+        { role: "user", content: userMessage },
+        { role: "assistant", content: reply },
+      ]),
+      lastIntent: inferIntentLabel(userMessage, reply),
+      lastCoffee: inferCoffee(reply) || context?.lastCoffee || "",
+      lastStyle: inferStyle(userMessage, reply) || context?.lastStyle || "",
     },
   };
 }
 
 function generateSummary(messages: { role: string; content: string }[]) {
-  const last = messages.slice(-6).map((m) => m.content).join(" ");
+  const last = messages
+    .slice(-6)
+    .map((m) => m.content)
+    .join(" ");
   return last.slice(0, 300);
+}
+
+function detectMoment(text: string): string | null {
+  const normalized = text.toLowerCase();
+
+  if (normalized.includes("sobremesa")) return "sobremesa";
+  if (normalized.includes("brunch")) return "brunch";
+  if (normalized.includes("desayuno")) return "mañana";
+  if (normalized.includes("mañana")) return "mañana";
+  if (normalized.includes("merienda")) return "tarde";
+  if (normalized.includes("tarde")) return "tarde";
+  if (normalized.includes("noche")) return "noche";
+
+  return null;
+}
+
+function detectIngredient(text: string): string | null {
+  const normalized = text.toLowerCase();
+
+  if (normalized.includes("chocolate") || normalized.includes("cacao")) {
+    return "chocolate";
+  }
+
+  if (
+    normalized.includes("cítrico") ||
+    normalized.includes("citricos") ||
+    normalized.includes("cítricos") ||
+    normalized.includes("naranja") ||
+    normalized.includes("limón") ||
+    normalized.includes("limon")
+  ) {
+    return "citricos";
+  }
+
+  if (
+    normalized.includes("fruta") ||
+    normalized.includes("frutos rojos") ||
+    normalized.includes("manzana") ||
+    normalized.includes("pera")
+  ) {
+    return "fruta";
+  }
+
+  return null;
+}
+
+function detectProductType(text: string): string | null {
+  const normalized = text.toLowerCase();
+
+  if (normalized.includes("torrija") || normalized.includes("torrijas")) {
+    return "torrija";
+  }
+
+  if (normalized.includes("mocktail") || normalized.includes("sin alcohol")) {
+    return "mocktail";
+  }
+
+  if (
+    normalized.includes("cocktail") ||
+    normalized.includes("cóctel") ||
+    normalized.includes("coctel")
+  ) {
+    return "cocktail";
+  }
+
+  if (
+    normalized.includes("postre") ||
+    normalized.includes("tarta") ||
+    normalized.includes("receta")
+  ) {
+    return "postre";
+  }
+
+  return null;
+}
+
+function detectSeason(text: string): string | null {
+  const normalized = text.toLowerCase();
+
+  if (
+    normalized.includes("primavera") ||
+    normalized.includes("semana santa") ||
+    normalized.includes("torrija") ||
+    normalized.includes("torrijas")
+  ) {
+    return "primavera";
+  }
+
+  if (normalized.includes("verano")) return "verano";
+  if (normalized.includes("otoño") || normalized.includes("otono")) return "otoño";
+  if (normalized.includes("invierno")) return "invierno";
+
+  return null;
+}
+
+function detectProfessionalContext(text: string): boolean {
+  const normalized = text.toLowerCase();
+
+  return (
+    normalized.includes("local") ||
+    normalized.includes("restaurante") ||
+    normalized.includes("cafetería") ||
+    normalized.includes("cafeteria") ||
+    normalized.includes("carta") ||
+    normalized.includes("negocio") ||
+    normalized.includes("hotel") ||
+    normalized.includes("horeca")
+  );
+}
+
+function inferCoffee(text: string): string | null {
+  const normalized = text.toLowerCase();
+
+  if (normalized.includes("pacamara")) return "Pacamara";
+  if (normalized.includes("geisha")) return "Geisha";
+  if (normalized.includes("catuai")) return "Catuai";
+
+  return null;
+}
+
+function inferIntentLabel(userMessage: string, reply: string): string {
+  const combined = `${userMessage} ${reply}`.toLowerCase();
+
+  if (
+    combined.includes("marid") ||
+    combined.includes("acompaña") ||
+    combined.includes("acompaña") ||
+    combined.includes("postre")
+  ) {
+    return "maridaje";
+  }
+
+  if (
+    combined.includes("receta") ||
+    combined.includes("elaboración") ||
+    combined.includes("elaboracion")
+  ) {
+    return "receta";
+  }
+
+  if (
+    combined.includes("cocktail") ||
+    combined.includes("cóctel") ||
+    combined.includes("coctel")
+  ) {
+    return "cóctel";
+  }
+
+  if (combined.includes("sin alcohol") || combined.includes("mocktail")) {
+    return "propuesta sin alcohol";
+  }
+
+  if (
+    combined.includes("comprar") ||
+    combined.includes("pruébalo") ||
+    combined.includes("pruebalo") ||
+    combined.includes("descubrirlo")
+  ) {
+    return "compra";
+  }
+
+  if (
+    combined.includes("local") ||
+    combined.includes("restaurante") ||
+    combined.includes("carta") ||
+    combined.includes("negocio")
+  ) {
+    return "propuesta para local";
+  }
+
+  return "recomendación de café";
+}
+
+function inferStyle(userMessage: string, reply: string): string | null {
+  const combined = `${userMessage} ${reply}`.toLowerCase();
+
+  if (combined.includes("sobremesa")) return "sobremesa";
+  if (combined.includes("brunch")) return "brunch";
+  if (combined.includes("más intenso") || combined.includes("mas intenso")) {
+    return "intenso";
+  }
+  if (
+    combined.includes("más suave") ||
+    combined.includes("mas suave") ||
+    combined.includes("delicado")
+  ) {
+    return "suave";
+  }
+  if (
+    combined.includes("especial") ||
+    combined.includes("sofisticado") ||
+    combined.includes("premium")
+  ) {
+    return "especial";
+  }
+
+  return null;
 }
