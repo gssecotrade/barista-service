@@ -108,44 +108,50 @@
     document.body.appendChild(panel);
 
     button.addEventListener("click", openPanel);
-    document
-      .getElementById("arte-barista-close")
-      .addEventListener("click", closePanel);
 
-      const input = document.getElementById("arte-barista-input");
-      const sendButton = document.getElementById("arte-barista-send");
-  
-      function autoResizeTextarea() {
-        input.style.height = "auto";
-        const nextHeight = Math.min(input.scrollHeight, 112);
-        input.style.height = `${nextHeight}px`;
-        input.style.overflowY = input.scrollHeight > 112 ? "auto" : "hidden";
-      }
-  
-      async function submitCurrentMessage() {
-        const text = input.value.trim();
-        if (!text) return;
-  
-        input.value = "";
-        autoResizeTextarea();
-        appendUserMessage(text);
-        await sendMessage(text);
-      }
-  
-      input.addEventListener("input", autoResizeTextarea);
-  
-      input.addEventListener("keydown", async function (e) {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          await submitCurrentMessage();
-        }
-      });
-  
-      sendButton.addEventListener("click", async function () {
-        await submitCurrentMessage();
-      });
-  
+    const closeButton = document.getElementById("arte-barista-close");
+    const input = document.getElementById("arte-barista-input");
+    const sendButton = document.getElementById("arte-barista-send");
+
+    if (!closeButton || !input || !sendButton) {
+      console.error("Arte Barista: faltan elementos del widget en createUI()");
+      return;
+    }
+
+    closeButton.addEventListener("click", closePanel);
+
+    function autoResizeTextarea() {
+      input.style.height = "auto";
+      const nextHeight = Math.min(input.scrollHeight, 112);
+      input.style.height = `${nextHeight}px`;
+      input.style.overflowY = input.scrollHeight > 112 ? "auto" : "hidden";
+    }
+
+    async function submitCurrentMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      input.value = "";
       autoResizeTextarea();
+      appendUserMessage(text);
+      await sendMessage(text);
+    }
+
+    input.addEventListener("input", autoResizeTextarea);
+
+    input.addEventListener("keydown", async function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        await submitCurrentMessage();
+      }
+    });
+
+    sendButton.addEventListener("click", async function () {
+      await submitCurrentMessage();
+    });
+
+    autoResizeTextarea();
+  }
 
   async function openPanel() {
     const panel = document.getElementById("arte-barista-panel");
@@ -260,13 +266,11 @@
     wrapper.appendChild(bubble);
 
     if (product && showProductCard) {
-    const safeImage = escapeHtml(product.image || "");
-    const safeName = escapeHtml(product.name || "");
-    const safeReason = escapeHtml(product.reason || "");
-    const safeUrl = escapeHtml(product.url || "#");
-    const safeHandle = escapeHtml(product.handle || "");
-    const safeCtaLabel = escapeHtml(getContextualCtaLabel(product));
-    const safeCtaTitle = escapeHtml(getContextualCtaTitle(product));
+      const safeName = escapeHtml(product.name || "");
+      const safeUrl = escapeHtml(product.url || "#");
+      const safeHandle = escapeHtml(product.handle || "");
+      const safeCtaLabel = escapeHtml(getContextualCtaLabel(product));
+      const safeCtaTitle = escapeHtml(getContextualCtaTitle(product));
 
       const card = document.createElement("div");
       card.className = "arte-card";
@@ -477,12 +481,12 @@ Mientras vuelve, dime: ¿te apetece algo más suave, más intenso o algo especia
 
 Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial para este momento?`;
   }
-  
+
   function getContextualCtaLabel(product) {
     const lastIntent = String(conversationState?.lastIntent || "").toLowerCase();
     const lastCoffee = String(conversationState?.lastCoffee || "").toLowerCase();
     const handle = String(product?.handle || "").toLowerCase();
-  
+
     if (
       lastIntent.includes("professional") ||
       lastIntent.includes("local") ||
@@ -491,7 +495,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
     ) {
       return "Ver café recomendado para carta";
     }
-  
+
     if (
       lastIntent.includes("pair") ||
       lastIntent.includes("marid") ||
@@ -501,7 +505,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
     ) {
       return "Ver café para esta propuesta";
     }
-  
+
     if (
       lastIntent.includes("cocktail") ||
       lastIntent.includes("mocktail") ||
@@ -509,7 +513,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
     ) {
       return "Ver café para esta creación";
     }
-  
+
     if (
       lastIntent.includes("order") ||
       lastIntent.includes("compra") ||
@@ -517,17 +521,17 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
     ) {
       return "Probar esta referencia";
     }
-  
+
     if (handle && lastCoffee && handle.includes(lastCoffee)) {
       return "Descubrir esta referencia";
     }
-  
+
     return "Descubrir este café";
   }
-  
+
   function getContextualCtaTitle(product) {
     const lastIntent = String(conversationState?.lastIntent || "").toLowerCase();
-  
+
     if (
       lastIntent.includes("professional") ||
       lastIntent.includes("local") ||
@@ -536,7 +540,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
     ) {
       return "Abrir la referencia recomendada para esta propuesta de carta";
     }
-  
+
     if (
       lastIntent.includes("pair") ||
       lastIntent.includes("marid") ||
@@ -546,7 +550,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
     ) {
       return "Abrir el café recomendado para este maridaje o receta";
     }
-  
+
     if (
       lastIntent.includes("cocktail") ||
       lastIntent.includes("mocktail") ||
@@ -554,13 +558,13 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
     ) {
       return "Abrir el café recomendado para esta elaboración";
     }
-  
+
     return "Abrir el café recomendado";
   }
 
   function getContextualCardLabel(product) {
     const lastIntent = String(conversationState?.lastIntent || "").toLowerCase();
-  
+
     if (
       lastIntent.includes("professional") ||
       lastIntent.includes("local") ||
@@ -569,7 +573,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
     ) {
       return "Referencia para carta";
     }
-  
+
     if (
       lastIntent.includes("pair") ||
       lastIntent.includes("marid") ||
@@ -579,7 +583,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
     ) {
       return "Café para esta propuesta";
     }
-  
+
     if (
       lastIntent.includes("cocktail") ||
       lastIntent.includes("mocktail") ||
@@ -587,7 +591,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
     ) {
       return "Base recomendada";
     }
-  
+
     return "Referencia sugerida";
   }
 
