@@ -144,7 +144,7 @@ ${context?.lastCoffee || "no definido"}
   ];
 
   const completion = await client.chat.completions.create({
-    model: "gpt-5.3",
+    model: "gpt-4o",
     messages,
     temperature: 0.7,
   });
