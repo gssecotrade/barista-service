@@ -93,7 +93,14 @@
       </div>
       <div id="arte-barista-messages"></div>
       <div id="arte-barista-input-wrap">
-        <input id="arte-barista-input" type="text" placeholder="Escribe tu consulta…" />
+        <div id="arte-barista-input-shell">
+          <textarea
+            id="arte-barista-input"
+            rows="1"
+            placeholder="Escribe tu consulta…"
+          ></textarea>
+          <button id="arte-barista-send" type="button" aria-label="Enviar consulta">→</button>
+        </div>
       </div>
     `;
 
@@ -105,18 +112,40 @@
       .getElementById("arte-barista-close")
       .addEventListener("click", closePanel);
 
-    const input = document.getElementById("arte-barista-input");
-    input.addEventListener("keydown", async function (e) {
-      if (e.key !== "Enter") return;
-
-      const text = input.value.trim();
-      if (!text) return;
-
-      input.value = "";
-      appendUserMessage(text);
-      await sendMessage(text);
-    });
-  }
+      const input = document.getElementById("arte-barista-input");
+      const sendButton = document.getElementById("arte-barista-send");
+  
+      function autoResizeTextarea() {
+        input.style.height = "auto";
+        const nextHeight = Math.min(input.scrollHeight, 112);
+        input.style.height = `${nextHeight}px`;
+        input.style.overflowY = input.scrollHeight > 112 ? "auto" : "hidden";
+      }
+  
+      async function submitCurrentMessage() {
+        const text = input.value.trim();
+        if (!text) return;
+  
+        input.value = "";
+        autoResizeTextarea();
+        appendUserMessage(text);
+        await sendMessage(text);
+      }
+  
+      input.addEventListener("input", autoResizeTextarea);
+  
+      input.addEventListener("keydown", async function (e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          await submitCurrentMessage();
+        }
+      });
+  
+      sendButton.addEventListener("click", async function () {
+        await submitCurrentMessage();
+      });
+  
+      autoResizeTextarea();
 
   async function openPanel() {
     const panel = document.getElementById("arte-barista-panel");
@@ -243,23 +272,13 @@
       card.className = "arte-card";
 
       card.innerHTML = `
-        <div class="arte-card-hero">
-          ${
-            safeImage
-              ? `<div class="arte-card-image">
-                   <img src="${safeImage}" alt="${safeName}" onerror="this.closest('.arte-card-image').style.display='none'" />
-                 </div>`
-              : ""
-          }
-          <div class="arte-card-main">
-            <div class="arte-card-kicker">Selección recomendada</div>
+        <div class="arte-card-minimal">
+          <div class="arte-card-minimal-main">
+            <div class="arte-card-kicker">${escapeHtml(getContextualCardLabel(product))}</div>
             <div class="arte-card-title">${safeName}</div>
             <div class="arte-card-chips">${buildProductChips(product)}</div>
           </div>
-        </div>
-        <div class="arte-card-body">
-          <div class="arte-card-text">${safeReason}</div>
-          <div class="arte-card-actions">
+          <div class="arte-card-actions arte-card-actions--minimal">
             <a
               href="${safeUrl}"
               target="_blank"
@@ -537,6 +556,39 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
     }
   
     return "Abrir el café recomendado";
+  }
+
+  function getContextualCardLabel(product) {
+    const lastIntent = String(conversationState?.lastIntent || "").toLowerCase();
+  
+    if (
+      lastIntent.includes("professional") ||
+      lastIntent.includes("local") ||
+      lastIntent.includes("negocio") ||
+      lastIntent.includes("carta")
+    ) {
+      return "Referencia para carta";
+    }
+  
+    if (
+      lastIntent.includes("pair") ||
+      lastIntent.includes("marid") ||
+      lastIntent.includes("postre") ||
+      lastIntent.includes("recipe") ||
+      lastIntent.includes("receta")
+    ) {
+      return "Café para esta propuesta";
+    }
+  
+    if (
+      lastIntent.includes("cocktail") ||
+      lastIntent.includes("mocktail") ||
+      lastIntent.includes("sin alcohol")
+    ) {
+      return "Base recomendada";
+    }
+  
+    return "Referencia sugerida";
   }
 
   async function sendMessage(message) {
