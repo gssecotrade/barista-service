@@ -20,6 +20,27 @@ const chatBodySchema = z.object({
     .optional(),
 });
 
+type BaristaTopic =
+  | "coffee_selection"
+  | "preparation"
+  | "pairing"
+  | "cocktail"
+  | "orders"
+  | "subscription"
+  | "education"
+  | "professional"
+  | "general";
+
+type CoffeeHandle = "catuai" | "geisha" | "pacamara";
+
+type ProductPayload = {
+  handle: CoffeeHandle;
+  name: string;
+  reason: string;
+  image: string;
+  url: string;
+};
+
 export async function chatRoutes(app: FastifyInstance) {
   app.post("/chat", async (request, reply) => {
     const parsed = chatBodySchema.safeParse(request.body);
@@ -96,35 +117,59 @@ export async function chatRoutes(app: FastifyInstance) {
       },
     });
 
-    const inferredCoffee = inferCoffeeFromText(
-      `${message} ${baristaReply} ${mergedInputState.lastCoffee ?? ""}`
-    );
+    const inferredCoffee =
+      inferCoffeeFromText(`${message} ${baristaReply}`) ??
+      normalizeCoffeeValue(updatedContext?.lastCoffee ?? null) ??
+      mergedInputState.activeCoffee ??
+      null;
 
-    const inferredTopic = inferTopicFromText(
-      `${message} ${baristaReply} ${mergedInputState.activeTopic ?? ""}`
-    );
+    const inferredTopic =
+      inferTopicFromText(`${message} ${baristaReply}`) ??
+      mergedInputState.activeTopic ??
+      "general";
 
-    const inferredDrinkType = inferDrinkTypeFromText(
-      `${message} ${baristaReply} ${mergedInputState.activeDrinkType ?? ""}`
-    );
+    const inferredDrinkType =
+      inferDrinkTypeFromText(`${message} ${baristaReply}`) ??
+      mergedInputState.activeDrinkType ??
+      null;
 
-    const inferredRecipe = inferRecipeFromText(baristaReply);
-    const inferredProduct = mapCoffeeToProduct(inferredCoffee, baristaReply);
+    const inferredRecipe =
+      inferRecipeFromText(`${message} ${baristaReply}`) ??
+      mergedInputState.activeRecipe ??
+      null;
+
+    const shouldShowProduct = shouldReturnProduct({
+      message,
+      reply: baristaReply,
+      topic: inferredTopic,
+      coffee: inferredCoffee,
+    });
+
+    const resolvedProduct = shouldShowProduct
+      ? mapCoffeeToProduct(inferredCoffee, {
+          topic: inferredTopic,
+          recipe: inferredRecipe,
+          userMessage: message,
+          reply: baristaReply,
+        })
+      : null;
 
     const nextState = mergeBaristaState(mergedInputState, {
-      activeCoffee: inferredCoffee ?? mergedInputState.activeCoffee,
-      activeTopic: inferredTopic ?? mergedInputState.activeTopic,
-      activeDrinkType: inferredDrinkType ?? mergedInputState.activeDrinkType,
-      activeRecipe: inferredRecipe ?? mergedInputState.activeRecipe,
+      activeCoffee: inferredCoffee,
+      activeTopic: inferredTopic,
+      activeDrinkType: inferredDrinkType,
+      activeRecipe: inferredRecipe,
       lastUserGoal: message,
       lastAssistantSummary:
         buildAssistantSummary({
-          coffee: inferredCoffee ?? mergedInputState.activeCoffee,
-          topic: inferredTopic ?? mergedInputState.activeTopic,
-          recipe: inferredRecipe ?? mergedInputState.activeRecipe,
-          drinkType: inferredDrinkType ?? mergedInputState.activeDrinkType,
+          coffee: inferredCoffee,
+          topic: inferredTopic,
+          recipe: inferredRecipe,
+          drinkType: inferredDrinkType,
           reply: baristaReply,
-        }) ?? updatedContext?.summary ?? mergedInputState.lastAssistantSummary,
+        }) ??
+        updatedContext?.summary ??
+        mergedInputState.lastAssistantSummary,
       conversationMode: "continue",
     });
 
@@ -138,7 +183,7 @@ export async function chatRoutes(app: FastifyInstance) {
           coffee: nextState.activeCoffee,
           recipe: nextState.activeRecipe,
           drinkType: nextState.activeDrinkType,
-          product: inferredProduct ?? null,
+          product: resolvedProduct ?? null,
         },
       },
     });
@@ -189,24 +234,14 @@ export async function chatRoutes(app: FastifyInstance) {
       ok: true,
       reply: baristaReply,
       intent: nextState.activeTopic ?? "general",
-      product: inferredProduct ?? null,
+      product: resolvedProduct,
       state: nextState,
     });
   });
 }
 
-function mapCoffeeFromContext(
-  value: string | null
-): "catuai" | "geisha" | "pacamara" | null {
-  if (!value) return null;
-
-  const normalized = value.toLowerCase().trim();
-
-  if (normalized.includes("catuai")) return "catuai";
-  if (normalized.includes("geisha")) return "geisha";
-  if (normalized.includes("pacamara")) return "pacamara";
-
-  return null;
+function mapCoffeeFromContext(value: string | null): CoffeeHandle | null {
+  return normalizeCoffeeValue(value);
 }
 
 function mapIntentToTopic(value: string | null): BaristaTopic | null {
@@ -225,27 +260,20 @@ function mapIntentToTopic(value: string | null): BaristaTopic | null {
   return "general";
 }
 
-type BaristaTopic =
-  | "coffee_selection"
-  | "preparation"
-  | "pairing"
-  | "cocktail"
-  | "orders"
-  | "subscription"
-  | "education"
-  | "professional"
-  | "general";
+function normalizeCoffeeValue(value: string | null | undefined): CoffeeHandle | null {
+  if (!value) return null;
 
-function inferCoffeeFromText(
-  value: string
-): "catuai" | "geisha" | "pacamara" | null {
-  const normalized = value.toLowerCase();
+  const normalized = String(value).toLowerCase();
 
+  if (normalized.includes("catuai")) return "catuai";
   if (normalized.includes("geisha")) return "geisha";
   if (normalized.includes("pacamara")) return "pacamara";
-  if (normalized.includes("catuai")) return "catuai";
 
   return null;
+}
+
+function inferCoffeeFromText(value: string): CoffeeHandle | null {
+  return normalizeCoffeeValue(value);
 }
 
 function inferTopicFromText(value: string): BaristaTopic | null {
@@ -281,15 +309,15 @@ function inferTopicFromText(value: string): BaristaTopic | null {
   if (
     normalized.includes("comprar") ||
     normalized.includes("pedido") ||
-    normalized.includes("encargar")
+    normalized.includes("encargar") ||
+    normalized.includes("probarlo") ||
+    normalized.includes("pruébalo") ||
+    normalized.includes("descubrirlo")
   ) {
     return "orders";
   }
 
-  if (
-    normalized.includes("suscrip") ||
-    normalized.includes("club")
-  ) {
+  if (normalized.includes("suscrip") || normalized.includes("club")) {
     return "subscription";
   }
 
@@ -359,18 +387,65 @@ function inferRecipeFromText(value: string): string | null {
   return null;
 }
 
+function shouldReturnProduct({
+  message,
+  reply,
+  topic,
+  coffee,
+}: {
+  message: string;
+  reply: string;
+  topic: BaristaTopic;
+  coffee: CoffeeHandle | null;
+}): boolean {
+  if (!coffee) return false;
+
+  const combined = `${message} ${reply}`.toLowerCase();
+
+  if (
+    topic === "coffee_selection" ||
+    topic === "orders" ||
+    topic === "subscription" ||
+    topic === "professional"
+  ) {
+    return true;
+  }
+
+  if (
+    combined.includes("recom") ||
+    combined.includes("qué café") ||
+    combined.includes("que café") ||
+    combined.includes("pruébalo") ||
+    combined.includes("probarlo") ||
+    combined.includes("descubrirlo") ||
+    combined.includes("comprar") ||
+    combined.includes("llevaría") ||
+    combined.includes("te recomendaría") ||
+    combined.includes("te recomendaria")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function mapCoffeeToProduct(
-  coffee: "catuai" | "geisha" | "pacamara" | null,
-  reply: string
-) {
+  coffee: CoffeeHandle | null,
+  options: {
+    topic: BaristaTopic;
+    recipe: string | null;
+    userMessage: string;
+    reply: string;
+  }
+): ProductPayload | null {
   if (!coffee) return null;
 
-  const catalog = {
+  const catalog: Record<CoffeeHandle, ProductPayload> = {
     catuai: {
       handle: "catuai",
       name: "Catuai",
       reason:
-        "Perfil equilibrado y versátil, ideal para quienes buscan un café accesible pero con profundidad.",
+        "Perfil equilibrado y versátil, ideal para quienes buscan un café elegante, amable y fácil de integrar en distintos momentos de consumo.",
       image:
         "https://arte-coffee.com/cdn/shop/files/Catuai_Lavado.jpg?v=1747402022",
       url: "https://arte-coffee.com/products/catuai",
@@ -379,7 +454,7 @@ function mapCoffeeToProduct(
       handle: "geisha",
       name: "Geisha",
       reason:
-        "Un café elegante y floral, pensado para experiencias más delicadas y sofisticadas.",
+        "Un café delicado, floral y sofisticado, perfecto para propuestas más aromáticas, cítricas o de perfil más refinado.",
       image:
         "https://arte-coffee.com/cdn/shop/files/Geisha_Lavado.jpg?v=1747402022",
       url: "https://arte-coffee.com/products/geisha",
@@ -388,19 +463,30 @@ function mapCoffeeToProduct(
       handle: "pacamara",
       name: "Pacamara",
       reason:
-        "Más estructura y complejidad en boca, ideal para propuestas gastronómicas y sobremesas con carácter.",
+        "Más estructura, complejidad y profundidad en boca, ideal para sobremesas, postres con carácter y propuestas gastronómicas de mayor presencia.",
       image:
         "https://arte-coffee.com/cdn/shop/files/Pacamara_Natural.jpg?v=1747402022",
       url: "https://arte-coffee.com/products/pacamara",
     },
-  } as const;
-
-  const item = catalog[coffee];
-
-  return {
-    ...item,
-    reason: item.reason,
   };
+
+  const base = catalog[coffee];
+
+  if (options.topic === "professional") {
+    return {
+      ...base,
+      reason: `${base.reason} En contexto de carta o local, es una referencia con suficiente personalidad para construir una propuesta diferencial.`,
+    };
+  }
+
+  if (options.topic === "pairing" || options.recipe) {
+    return {
+      ...base,
+      reason: `${base.reason} Aquí encaja especialmente bien para acompañar o construir la propuesta gastronómica que estáis trabajando.`,
+    };
+  }
+
+  return base;
 }
 
 function buildFriendlySummary(
@@ -432,6 +518,12 @@ function buildFriendlySummary(
     )}.`;
   }
 
+  if (state.activeTopic === "professional" && state.activeCoffee) {
+    return `La última vez estábamos trabajando una propuesta para negocio con ${prettyCoffee(
+      state.activeCoffee
+    )}.`;
+  }
+
   if (state.activeCoffee) {
     return `La última vez estuvimos hablando de ${prettyCoffee(
       state.activeCoffee
@@ -448,7 +540,7 @@ function buildAssistantSummary({
   drinkType,
   reply,
 }: {
-  coffee: "catuai" | "geisha" | "pacamara" | null;
+  coffee: CoffeeHandle | null;
   topic: BaristaTopic | null;
   recipe: string | null;
   drinkType: "coffee" | "cocktail" | "mocktail" | null;
