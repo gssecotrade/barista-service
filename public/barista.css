@@ -8,7 +8,7 @@
   position: fixed;
   left: 18px;
   right: auto;
-  bottom: 108px;
+  bottom: 72px;
   width: 68px;
   height: 68px;
   border: 1px solid rgba(201, 169, 110, 0.45);
@@ -40,7 +40,7 @@
 
 #arte-barista-button-label {
   position: absolute;
-  top: calc(100% - 10px);
+  top: calc(100% - 14px);
   left: 50%;
   transform: translateX(-50%);
   min-width: 104px;
@@ -486,6 +486,50 @@
 
   .arte-card-title {
     font-size: 18px;
+  }
+
+  .arte-card-actions--minimal a {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  #arte-barista-button {
+    left: 12px;
+    bottom: 34px;
+    width: 62px;
+    height: 62px;
+  }
+
+  #arte-barista-button img {
+    width: 50px;
+    height: 50px;
+  }
+
+  #arte-barista-button-label {
+    top: calc(100% - 16px);
+    min-width: 96px;
+    padding: 8px 12px 9px;
+    font-size: 10px;
+  }
+
+  #arte-barista-panel {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: calc(100dvh - 126px);
+    max-height: none;
+    border-radius: 26px 26px 0 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+  }
+
+  .arte-card-minimal {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
   }
 
   .arte-card-actions--minimal a {
