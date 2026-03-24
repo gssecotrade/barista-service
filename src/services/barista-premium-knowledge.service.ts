@@ -121,7 +121,14 @@ export type PremiumContext = {
   3. lógica gastronómica
   4. clave de presentación
   5. valor comercial o de carta
+
+  En contexto profesional:
+  - puedes proponer una “versión de carta”
+  - puedes sugerir una “versión signature”
+  - puedes orientar la propuesta a sobremesa premium, brunch o postre de temporada
+  - la respuesta debe ser útil para que el responsable del local imagine cómo venderla
   `);
+  
     }
   
     return blocks.join("\n");
