@@ -21,6 +21,8 @@ export async function generateBaristaResponse({
   history: { role: string; content: string }[];
   context?: BaristaContext;
 }) {
+  const currentDateContext = `Fecha actual de referencia: marzo de 2026. Estación probable en España: primavera. Si el usuario habla de temporada actual, interpreta el contexto desde esta fecha y no como otoño o invierno salvo que el usuario diga otra cosa.`;
+  
   const premiumKnowledge = getPremiumKnowledge({
     moment: detectMoment(userMessage),
     ingredient: detectIngredient(userMessage),
@@ -125,6 +127,7 @@ Siempre que sea posible:
 3. explica por qué
 4. añade una propuesta diferencial
 5. deja abierta una continuación útil
+6. Si hay dos caminos válidos, preséntalos como dos opciones claras, pero indica cuál elegirías tú y por qué.
 
 ---
 
@@ -148,6 +151,7 @@ CONOCIMIENTO PREMIUM ADICIONAL
 
 ${premiumKnowledge}
 
+${currentDateContext}
 ---
 
 CONTINUIDAD
@@ -165,6 +169,17 @@ ${context?.lastIntent || "no definida"}
 
 Último estilo:
 ${context?.lastStyle || "no definido"}
+
+---
+
+COHERENCIA DE RECOMENDACIÓN
+
+- Si ya hay un café recomendado en el contexto previo o en "Último café", prioriza mantenerlo.
+- Solo puedes cambiar de café si hay una razón clara y explícita.
+- Si cambias de café, explícalo de forma natural y breve.
+- No cambies de café por variar.
+- La continuidad tiene más valor que la novedad.
+- Si el usuario pide una receta, maridaje o evolución de una propuesta ya iniciada, parte del café activo salvo que sea claramente mejor otro y lo justifiques.
 
 ---
 
