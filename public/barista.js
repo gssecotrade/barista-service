@@ -294,10 +294,15 @@
 
             <button
               type="button"
-              class="arte-card-add"
+              class="arte-card-add-icon"
               onclick="return window.arteBaristaAddToCart('${safeHandle}')"
+              aria-label="Añadir al carrito"
             >
-              Añadir al carrito
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M6 6h15l-1.5 9h-12z" stroke="#0d1016" stroke-width="1.5"/>
+                <circle cx="9" cy="20" r="1.5" fill="#0d1016"/>
+                <circle cx="18" cy="20" r="1.5" fill="#0d1016"/>
+              </svg>
             </button>
           </div>
         </div>

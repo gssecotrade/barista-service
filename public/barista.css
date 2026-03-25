@@ -549,4 +549,49 @@
     font-size: 11px;
     padding: 7px 10px;
   }
+
+  .arte-card-actions--minimal {
+    flex-direction: row;
+  }
+  
+  .arte-card-add-icon {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* --- CTA icono carrito --- */
+
+.arte-card-actions--minimal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.arte-card-actions--minimal a {
+  flex: 1;
+}
+
+.arte-card-add-icon {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(13, 16, 22, 0.12);
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.arte-card-add-icon:hover {
+  background: #0d1016;
+}
+
+.arte-card-add-icon:hover svg path,
+.arte-card-add-icon:hover svg circle {
+  stroke: #ffffff;
+  fill: #ffffff;
 }
