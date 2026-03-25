@@ -382,6 +382,32 @@
   opacity: 0.94;
 }
 
+.arte-card-actions--minimal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.arte-card-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(13, 16, 22, 0.16);
+  background: #ffffff;
+  color: #0d1016;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.arte-card-add:hover {
+  background: #f8f5ef;
+}
+
 @media (max-width: 1024px) {
   #arte-barista-panel {
     left: 24px;
@@ -491,6 +517,10 @@
   }
 
   .arte-card-actions--minimal a {
+    width: 100%;
+  }
+
+  .arte-card-add {
     width: 100%;
   }
 }

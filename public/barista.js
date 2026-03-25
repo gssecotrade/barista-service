@@ -284,13 +284,21 @@
           </div>
           <div class="arte-card-actions arte-card-actions--minimal">
             <a
-              href="${safeUrl}"
-              target="_blank"
+              href="${safeUrl}?ref=barista"
               rel="noopener noreferrer"
               title="${safeCtaTitle}"
+              onclick="return window.arteBaristaNavigate('${safeHandle}')"
               data-product-click="true"
               data-product-handle="${safeHandle}"
             >${safeCtaLabel}</a>
+
+            <button
+              type="button"
+              class="arte-card-add"
+              onclick="return window.arteBaristaAddToCart('${safeHandle}')"
+            >
+              Añadir al carrito
+            </button>
           </div>
         </div>
       `;
@@ -685,3 +693,92 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
     init();
   }
 })();
+
+(function () {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const highlight = params.get('highlight');
+
+    if (!highlight) return;
+
+    setTimeout(() => {
+      const el = document.querySelector(`[data-product-handle="${highlight}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.outline = '2px solid #c9a96e';
+        el.style.outlineOffset = '4px';
+      }
+    }, 900);
+  } catch (e) {}
+})();
+
+window.arteBaristaNavigate = function (handle) {
+  try {
+    const isCollection = window.location.pathname.includes('/collections');
+
+    if (!isCollection) {
+      window.location.href = `/collections/all?highlight=${handle}`;
+      return false;
+    }
+
+    const el = document.querySelector(`[data-product-handle="${handle}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      window.location.href = `/products/${handle}`;
+    }
+
+    return false;
+  } catch (e) {
+    window.location.href = `/products/${handle}`;
+    return false;
+  }
+};
+
+window.arteBaristaAddToCart = async function (handle) {
+  try {
+    const productUrl = `/products/${handle}.js`;
+    const productRes = await fetch(productUrl);
+
+    if (!productRes.ok) {
+      window.location.href = `/products/${handle}`;
+      return false;
+    }
+
+    const product = await productRes.json();
+    const firstAvailableVariant = (product.variants || []).find((v) => v.available);
+
+    if (!firstAvailableVariant) {
+      window.location.href = `/products/${handle}`;
+      return false;
+    }
+
+    const addRes = await fetch('/cart/add.js', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        id: firstAvailableVariant.id,
+        quantity: 1,
+      }),
+    });
+
+    if (!addRes.ok) {
+      window.location.href = `/products/${handle}`;
+      return false;
+    }
+
+    const cartBubble = document.querySelector('#cart-icon-bubble, .cart-count-bubble');
+    if (cartBubble) {
+      cartBubble.dispatchEvent(new Event('change'));
+    }
+
+    alert('Producto añadido al carrito');
+    return false;
+  } catch (e) {
+    window.location.href = `/products/${handle}`;
+    return false;
+  }
+};
