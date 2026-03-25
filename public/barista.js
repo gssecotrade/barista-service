@@ -298,10 +298,9 @@
               onclick="return window.arteBaristaAddToCart('${safeHandle}')"
               aria-label="Añadir al carrito"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M6 6h15l-1.5 9h-12z" stroke="#0d1016" stroke-width="1.5"/>
-                <circle cx="9" cy="20" r="1.5" fill="#0d1016"/>
-                <circle cx="18" cy="20" r="1.5" fill="#0d1016"/>
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M8 10L12 4L16 10" stroke="#0d1016" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M6 10H18L17 19H7L6 10Z" stroke="#0d1016" stroke-width="1.6" stroke-linejoin="round"/>
               </svg>
             </button>
           </div>
@@ -506,7 +505,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
       lastIntent.includes("negocio") ||
       lastIntent.includes("carta")
     ) {
-      return "Ver café recomendado para carta";
+      return "Ver café";
     }
 
     if (
