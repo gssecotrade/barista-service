@@ -295,7 +295,7 @@
             <button
               type="button"
               class="arte-card-add-icon"
-              onclick="return window.arteBaristaAddToCart('${safeHandle}')"
+              onclick="return window.arteBaristaAddToCart('${safeHandle}', this)"
               aria-label="Añadir al carrito"
             >
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -505,7 +505,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
       lastIntent.includes("negocio") ||
       lastIntent.includes("carta")
     ) {
-      return "Ver café";
+      return "Café recomendado";
     }
 
     if (
@@ -515,7 +515,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
       lastIntent.includes("recipe") ||
       lastIntent.includes("receta")
     ) {
-      return "Ver café para esta propuesta";
+      return "Café recomendado";
     }
 
     if (
@@ -523,7 +523,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
       lastIntent.includes("mocktail") ||
       lastIntent.includes("sin alcohol")
     ) {
-      return "Ver café para esta creación";
+      return "Café recomendado";
     }
 
     if (
@@ -531,14 +531,14 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
       lastIntent.includes("compra") ||
       lastIntent.includes("subscription")
     ) {
-      return "Probar esta referencia";
+      return "Café recomendado";
     }
 
     if (handle && lastCoffee && handle.includes(lastCoffee)) {
-      return "Descubrir esta referencia";
+      return "Café recomendado";
     }
 
-    return "Descubrir este café";
+    return "Café recomendado";
   }
 
   function getContextualCtaTitle(product) {
@@ -550,7 +550,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
       lastIntent.includes("negocio") ||
       lastIntent.includes("carta")
     ) {
-      return "Abrir la referencia recomendada para esta propuesta de carta";
+      return "Café recomendado recomendado para esta propuesta de carta";
     }
 
     if (
@@ -560,7 +560,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
       lastIntent.includes("recipe") ||
       lastIntent.includes("receta")
     ) {
-      return "Abrir el café recomendado para este maridaje o receta";
+      return "Café recomendado para este maridaje o receta";
     }
 
     if (
@@ -568,10 +568,10 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
       lastIntent.includes("mocktail") ||
       lastIntent.includes("sin alcohol")
     ) {
-      return "Abrir el café recomendado para esta elaboración";
+      return "Café recomendado recomendado para esta elaboración";
     }
 
-    return "Abrir el café recomendado";
+    return "Café recomendado";
   }
 
   function getContextualCardLabel(product) {
@@ -583,7 +583,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
       lastIntent.includes("negocio") ||
       lastIntent.includes("carta")
     ) {
-      return "Referencia para carta";
+      return "Café recomendado para carta";
     }
 
     if (
@@ -593,7 +593,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
       lastIntent.includes("recipe") ||
       lastIntent.includes("receta")
     ) {
-      return "Café para esta propuesta";
+      return "Café recomendado para esta propuesta";
     }
 
     if (
@@ -604,7 +604,7 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
       return "Base recomendada";
     }
 
-    return "Referencia sugerida";
+    return "Café sugerido";
   }
 
   async function sendMessage(message) {
@@ -739,8 +739,16 @@ window.arteBaristaNavigate = function (handle) {
   }
 };
 
-window.arteBaristaAddToCart = async function (handle) {
+window.arteBaristaAddToCart = async function (handle, trigger) {
   try {
+    const button = trigger || null;
+
+    if (button) {
+      button.disabled = true;
+      button.classList.remove('is-added', 'is-error');
+      button.classList.add('is-loading');
+    }
+
     const productUrl = `/products/${handle}.js`;
     const productRes = await fetch(productUrl);
 
@@ -774,15 +782,48 @@ window.arteBaristaAddToCart = async function (handle) {
       return false;
     }
 
-    const cartBubble = document.querySelector('#cart-icon-bubble, .cart-count-bubble');
-    if (cartBubble) {
-      cartBubble.dispatchEvent(new Event('change'));
+    if (button) {
+      button.classList.remove('is-loading');
+      button.classList.add('is-added');
+      button.disabled = false;
+
+      const feedback = button.closest('.arte-card')?.querySelector('.arte-card-feedback');
+      if (feedback) {
+        feedback.textContent = 'Añadido al carrito';
+        feedback.classList.add('is-visible');
+      }
+
+      setTimeout(() => {
+        button.classList.remove('is-added');
+        const feedbackLater = button.closest('.arte-card')?.querySelector('.arte-card-feedback');
+        if (feedbackLater) {
+          feedbackLater.classList.remove('is-visible');
+        }
+      }, 1800);
     }
 
-    alert('Producto añadido al carrito');
     return false;
   } catch (e) {
-    window.location.href = `/products/${handle}`;
+    if (trigger) {
+      trigger.classList.remove('is-loading');
+      trigger.classList.add('is-error');
+      trigger.disabled = false;
+
+      const feedback = trigger.closest('.arte-card')?.querySelector('.arte-card-feedback');
+      if (feedback) {
+        feedback.textContent = 'No se pudo añadir';
+        feedback.classList.add('is-visible');
+      }
+
+      setTimeout(() => {
+        trigger.classList.remove('is-error');
+        const feedbackLater = trigger.closest('.arte-card')?.querySelector('.arte-card-feedback');
+        if (feedbackLater) {
+          feedbackLater.classList.remove('is-visible');
+        }
+      }, 1800);
+    }
+
     return false;
   }
 };
