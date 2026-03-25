@@ -256,7 +256,7 @@
     if (el) el.scrollTop = el.scrollHeight;
   }
 
-  function appendAssistantMessage(text, product, showProductCard = false) {
+  function appendAssistantMessage(text, productData, showProductCard = false) {
     const wrapper = document.createElement("div");
     wrapper.className = "arte-msg arte-msg-assistant";
 
@@ -265,69 +265,21 @@
     bubble.innerHTML = formatText(cleanAssistantText(text));
     wrapper.appendChild(bubble);
 
-    if (product && showProductCard) {
-      const safeName = escapeHtml(product.name || "");
-      const safeUrl = escapeHtml(product.url || "#");
-      const safeHandle = escapeHtml(product.handle || "");
-      const safeCtaLabel = escapeHtml(getContextualCtaLabel(product));
-      const safeCtaTitle = escapeHtml(getContextualCtaTitle(product));
-
-      const card = document.createElement("div");
-      card.className = "arte-card";
-
-      card.innerHTML = `
-        <div class="arte-card-minimal">
-          <div class="arte-card-minimal-main">
-            <div class="arte-card-kicker">${escapeHtml(getContextualCardLabel(product))}</div>
-            <div class="arte-card-title">${safeName}</div>
-            <div class="arte-card-chips">${buildProductChips(product)}</div>
-          </div>
-          <div class="arte-card-actions arte-card-actions--minimal">
-            <a
-              href="${safeUrl}?ref=barista"
-              rel="noopener noreferrer"
-              title="${safeCtaTitle}"
-              onclick="return window.arteBaristaNavigate('${safeHandle}')"
-              data-product-click="true"
-              data-product-handle="${safeHandle}"
-            >${safeCtaLabel}</a>
-
-            <button
-              type="button"
-              class="arte-card-add-icon"
-              onclick="return window.arteBaristaAddToCart('${safeHandle}', this)"
-              aria-label="Añadir al carrito"
-            >
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M8 10L12 4L16 10" stroke="#0d1016" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M6 10H18L17 19H7L6 10Z" stroke="#0d1016" stroke-width="1.6" stroke-linejoin="round"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      `;
-
-      wrapper.appendChild(card);
-
-      card.querySelectorAll("[data-product-click='true']").forEach((link) => {
-        link.addEventListener("click", async function () {
-          try {
-            const currentSession = await ensureSession();
-
-            await fetch(`${API_BASE}/track`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                userId: currentSession.userId,
-                type: "product_clicked",
-                meta: {
-                  handle: this.getAttribute("data-product-handle") || "",
-                },
-              }),
-            });
-          } catch {}
-        });
-      });
+    if (showProductCard) {
+      const productList =
+        Array.isArray(productData?.products) && productData.products.length
+          ? productData.products
+          : Array.isArray(productData)
+          ? productData
+          : productData
+          ? [productData]
+          : [];
+    
+      const cards = renderProductCards(productList);
+    
+      if (cards) {
+        wrapper.appendChild(cards);
+      }
     }
 
     messagesEl().appendChild(wrapper);
@@ -392,6 +344,102 @@
       .join("");
   }
 
+  function buildProductCard(product) {
+    if (!product) return null;
+  
+    const safeName = escapeHtml(product.name || "");
+    const safeUrl = escapeHtml(product.url || "#");
+    const safeHandle = escapeHtml(product.handle || "");
+    const safeCtaLabel = escapeHtml(getContextualCtaLabel(product));
+    const safeCtaTitle = escapeHtml(getContextualCtaTitle(product));
+  
+    const card = document.createElement("div");
+    card.className = "arte-card";
+  
+    card.innerHTML = `
+      <div class="arte-card-minimal">
+        <div class="arte-card-minimal-main">
+          <div class="arte-card-kicker">${escapeHtml(getContextualCardLabel(product))}</div>
+          <div class="arte-card-title">${safeName}</div>
+          <div class="arte-card-chips">${buildProductChips(product)}</div>
+        </div>
+  
+        <div class="arte-card-actions arte-card-actions--minimal">
+          <a
+            href="${safeUrl}?ref=barista"
+            rel="noopener noreferrer"
+            title="${safeCtaTitle}"
+            onclick="return window.arteBaristaNavigate('${safeHandle}')"
+            data-product-click="true"
+            data-product-handle="${safeHandle}"
+          >${safeCtaLabel}</a>
+  
+          <button
+            type="button"
+            class="arte-card-add-icon"
+            onclick="return window.arteBaristaAddToCart('${safeHandle}', this)"
+            aria-label="Añadir al carrito"
+          >
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M8 10L12 4L16 10" stroke="#0d1016" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M6 10H18L17 19H7L6 10Z" stroke="#0d1016" stroke-width="1.6" stroke-linejoin="round"/>
+            </svg>
+          </button>
+  
+          <div class="arte-card-feedback" aria-live="polite"></div>
+        </div>
+      </div>
+    `;
+  
+    card.querySelectorAll("[data-product-click='true']").forEach((link) => {
+      link.addEventListener("click", async function () {
+        try {
+          const currentSession = await ensureSession();
+  
+          await fetch(`${API_BASE}/track`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: currentSession.userId,
+              type: "product_clicked",
+              meta: {
+                handle: this.getAttribute("data-product-handle") || "",
+              },
+            }),
+          });
+        } catch {}
+      });
+    });
+  
+    return card;
+  }
+  
+  function renderProductCards(products) {
+    if (!Array.isArray(products) || !products.length) return null;
+  
+    const unique = [];
+    const seen = new Set();
+  
+    products.forEach((product) => {
+      const handle = String(product?.handle || "").trim();
+      if (!handle || seen.has(handle)) return;
+      seen.add(handle);
+      unique.push(product);
+    });
+  
+    if (!unique.length) return null;
+  
+    const container = document.createElement("div");
+    container.className = "arte-card-list";
+  
+    unique.slice(0, 3).forEach((product) => {
+      const card = buildProductCard(product);
+      if (card) container.appendChild(card);
+    });
+  
+    return container;
+  }
+  
   async function ensureSession(forceRefresh = false) {
     if (!forceRefresh && session) return session;
     if (!forceRefresh && sessionPromise) return sessionPromise;
@@ -644,15 +692,30 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
           ? data.state.lastAssistantSummary
           : conversationState.lastSummary || "";
 
-      let showProductCard = false;
+          let showProductCard = false;
 
-      if (data.product?.name) {
-        const newCoffee = data.product.name;
-        showProductCard = !previousCoffee || previousCoffee !== newCoffee;
-        conversationState.lastCoffee = newCoffee;
-      } else if (data.state?.activeCoffee) {
-        conversationState.lastCoffee = data.state.activeCoffee;
-      }
+          const responseProducts =
+            Array.isArray(data.products) && data.products.length
+              ? data.products
+              : data.product
+              ? [data.product]
+              : [];
+          
+          if (responseProducts.length) {
+            const firstProduct = responseProducts[0];
+            const newCoffee = firstProduct?.name || "";
+          
+            showProductCard =
+              responseProducts.length > 1 ||
+              !previousCoffee ||
+              previousCoffee !== newCoffee;
+          
+            if (newCoffee) {
+              conversationState.lastCoffee = newCoffee;
+            }
+          } else if (data.state?.activeCoffee) {
+            conversationState.lastCoffee = data.state.activeCoffee;
+          }
 
       saveState();
 
@@ -672,7 +735,9 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
 
       appendAssistantMessage(
         data.reply || "No he podido responder.",
-        data.product,
+        responseProducts.length > 1
+          ? responseProducts
+          : responseProducts[0] || null,
         showProductCard
       );
     } catch {

@@ -636,3 +636,20 @@
 .arte-card-add-icon.is-error {
   border-color: rgba(216, 76, 67, 0.5);
 }
+
+.arte-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(100%, 320px);
+}
+
+.arte-card-list .arte-card {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .arte-card-list {
+    width: min(100%, 340px);
+  }
+}
