@@ -145,14 +145,15 @@ export async function chatRoutes(app: FastifyInstance) {
       coffee: inferredCoffee,
     });
 
-    const resolvedProduct = shouldShowProduct
-      ? mapCoffeeToProduct(inferredCoffee, {
+    const resolvedProducts = shouldShowProduct
+      ? resolveProductsFromReply({
+          reply: baristaReply,
+          fallbackCoffee: inferredCoffee,
           topic: inferredTopic,
           recipe: inferredRecipe,
           userMessage: message,
-          reply: baristaReply,
         })
-      : null;
+      : [];
 
     const nextState = mergeBaristaState(mergedInputState, {
       activeCoffee: inferredCoffee,
@@ -183,7 +184,8 @@ export async function chatRoutes(app: FastifyInstance) {
           coffee: nextState.activeCoffee,
           recipe: nextState.activeRecipe,
           drinkType: nextState.activeDrinkType,
-          product: resolvedProduct ?? null,
+          product: resolvedProducts[0] ?? null,
+          products: resolvedProducts,
         },
       },
     });
@@ -234,7 +236,9 @@ export async function chatRoutes(app: FastifyInstance) {
       ok: true,
       reply: baristaReply,
       intent: nextState.activeTopic ?? "general",
-      product: resolvedProduct,
+      product: resolvedProducts[0] ?? null,
+      products: resolvedProducts,
+      primaryProduct: resolvedProducts[0] ?? null,
       state: nextState,
     });
   });
@@ -398,7 +402,7 @@ function shouldReturnProduct({
   topic: BaristaTopic;
   coffee: CoffeeHandle | null;
 }): boolean {
-  if (!coffee) return false;
+  if (!coffee && !containsAnyCoffeeMention(`${message} ${reply}`)) return false;
 
   const combined = `${message} ${reply}`.toLowerCase();
 
@@ -487,6 +491,53 @@ function mapCoffeeToProduct(
   }
 
   return base;
+}
+
+function resolveProductsFromReply({
+  reply,
+  fallbackCoffee,
+  topic,
+  recipe,
+  userMessage,
+}: {
+  reply: string;
+  fallbackCoffee: CoffeeHandle | null;
+  topic: BaristaTopic;
+  recipe: string | null;
+  userMessage: string;
+}): ProductPayload[] {
+  const combined = `${userMessage} ${reply}`.toLowerCase();
+  const handles: CoffeeHandle[] = [];
+
+  if (combined.includes("catuai")) handles.push("catuai");
+  if (combined.includes("geisha")) handles.push("geisha");
+  if (combined.includes("pacamara")) handles.push("pacamara");
+
+  if (handles.length === 0 && fallbackCoffee) {
+    handles.push(fallbackCoffee);
+  }
+
+  const uniqueHandles = Array.from(new Set(handles)).slice(0, 3);
+
+  return uniqueHandles
+    .map((handle) =>
+      mapCoffeeToProduct(handle, {
+        topic,
+        recipe,
+        userMessage,
+        reply,
+      })
+    )
+    .filter(Boolean) as ProductPayload[];
+}
+
+function containsAnyCoffeeMention(value: string): boolean {
+  const normalized = value.toLowerCase();
+  return (
+    normalized.includes("catuai") ||
+    normalized.includes("geisha") ||
+    normalized.includes("pacamara")
+  );
 }
 
 function buildFriendlySummary(
