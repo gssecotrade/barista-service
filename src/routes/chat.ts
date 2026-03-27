@@ -138,12 +138,17 @@ export async function chatRoutes(app: FastifyInstance) {
       mergedInputState.activeRecipe ??
       null;
 
-    const shouldShowProduct = shouldReturnProduct({
-      message,
-      reply: baristaReply,
-      topic: inferredTopic,
-      coffee: inferredCoffee,
-    });
+      const shouldShowProduct =
+      shouldReturnProduct({
+        message,
+        reply: baristaReply,
+        topic: inferredTopic,
+        coffee: inferredCoffee,
+      }) &&
+      !isCommercialClosingStep({
+        message,
+        reply: baristaReply,
+      });
 
     const resolvedProducts = shouldShowProduct
       ? resolveProductsFromReply({
@@ -538,6 +543,50 @@ function containsAnyCoffeeMention(value: string): boolean {
     normalized.includes("geisha") ||
     normalized.includes("pacamara")
   );
+}
+
+function isCommercialClosingStep({
+  message,
+  reply,
+}: {
+  message: string;
+  reply: string;
+}): boolean {
+  const combined = `${message} ${reply}`.toLowerCase();
+
+  const userAskedForPurchasePlanning =
+    combined.includes("cuánto comprar") ||
+    combined.includes("cuanto comprar") ||
+    combined.includes("cantidad") ||
+    combined.includes("consumo mensual") ||
+    combined.includes("consumo semanal") ||
+    combined.includes("qué comprar") ||
+    combined.includes("que comprar") ||
+    combined.includes("qué me conviene") ||
+    combined.includes("que me conviene") ||
+    combined.includes("formato") ||
+    combined.includes("rutina de consumo") ||
+    combined.includes("tomo") ||
+    combined.includes("cafés diarios") ||
+    combined.includes("cafes diarios");
+
+  const assistantIsStillAskingToClose =
+    reply.includes("¿") &&
+    (
+      combined.includes("prefieres una sola referencia") ||
+      combined.includes("prefieres una sola") ||
+      combined.includes("combinar dos cafés") ||
+      combined.includes("combinar dos cafes") ||
+      combined.includes("en grano o molido") ||
+      combined.includes("grano o molido") ||
+      combined.includes("qué formato") ||
+      combined.includes("que formato") ||
+      combined.includes("250 g") ||
+      combined.includes("500 g") ||
+      combined.includes("1 kg")
+    );
+
+  return userAskedForPurchasePlanning && assistantIsStillAskingToClose;
 }
 
 function buildFriendlySummary(
