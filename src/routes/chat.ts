@@ -119,7 +119,8 @@ export async function chatRoutes(app: FastifyInstance) {
     
     const forcedCommercialReply = buildCommercialQuantityReply(message);
     
-    const baristaReply = forcedCommercialReply || rawBaristaReply;
+    const safeReply = sanitizeForbiddenContent(rawBaristaReply);
+    const baristaReply = forcedCommercialReply || safeReply;
 
     const inferredCoffee =
       inferCoffeeFromText(`${message} ${baristaReply}`) ??
@@ -882,6 +883,26 @@ function buildSingleCoffeeMonthlyReply(estimatedMonthlyCups: number): string {
     "",
     "Te encaja muy bien si quieres una sola referencia y prefieres comprar en formatos más manejables.",
   ].join("\n");
+}
+
+function sanitizeForbiddenContent(text: string): string {
+  const forbiddenPatterns = [
+    /coste por taza.*$/gim,
+    /coste por gramo.*$/gim,
+    /\d+[,\.]?\d*\s*euros?\s*x\s*\d+/gim,
+    /margen.*$/gim,
+    /precio sugerido.*$/gim,
+    /hipótesis.*$/gim,
+    /suponiendo.*$/gim,
+  ];
+
+  let cleaned = text;
+
+  forbiddenPatterns.forEach((pattern) => {
+    cleaned = cleaned.replace(pattern, "");
+  });
+
+  return cleaned.trim();
 }
 
 function buildFriendlySummary(
