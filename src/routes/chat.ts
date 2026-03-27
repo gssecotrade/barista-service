@@ -104,7 +104,7 @@ export async function chatRoutes(app: FastifyInstance) {
       },
     });
 
-    const { reply: baristaReply, updatedContext } = await generateBaristaResponse({
+    const { reply: rawBaristaReply, updatedContext } = await generateBaristaResponse({
       userMessage: message,
       history,
       context: {
@@ -116,6 +116,10 @@ export async function chatRoutes(app: FastifyInstance) {
           buildFriendlySummary(mergedInputState),
       },
     });
+    
+    const forcedCommercialReply = buildCommercialQuantityReply(message);
+    
+    const baristaReply = forcedCommercialReply || rawBaristaReply;
 
     const inferredCoffee =
       inferCoffeeFromText(`${message} ${baristaReply}`) ??
@@ -632,6 +636,86 @@ function isNonCommercialQuantityReply({
     userAskedForPurchaseQuantity &&
     (replyLooksTechnicalInsteadOfCommercial || replyDoesNotUseCommercialFormats)
   );
+}
+
+function buildCommercialQuantityReply(message: string): string | null {
+  if (!isMonthlyQuantityIntent(message)) return null;
+
+  const normalized = message.toLowerCase();
+
+  const wantsWeekendDifferentiation =
+    normalized.includes("fin de semana") ||
+    normalized.includes("fines de semana") ||
+    normalized.includes("después de comer") ||
+    normalized.includes("despues de comer") ||
+    normalized.includes("media mañana") ||
+    normalized.includes("media manana");
+
+  const dailyCoffees = extractDailyCoffeeCount(normalized) ?? 3;
+
+  // Regla comercial simple y robusta:
+  // - hasta 2 cafés/día: 2 bolsas de 250 g
+  // - 3 cafés/día con rutina semanal: 2 bolsas de 500 g
+  // - si además diferencia fin de semana/sobremesa: añadir 1 bolsa de 250 g premium
+  if (dailyCoffees >= 3 && wantsWeekendDifferentiation) {
+    return [
+      "Recomendación mensual:",
+      "- 2 bolsas de 500 g de Catuai para el consumo diario",
+      "- 1 bolsa de 250 g de Pacamara para sobremesas y fines de semana",
+      "",
+      "Tienes cubierto el mes con una base equilibrada y una referencia con más carácter.",
+    ].join("\n");
+  }
+
+  if (dailyCoffees >= 3) {
+    return [
+      "Recomendación mensual:",
+      "- 2 bolsas de 500 g de Catuai para cubrir tu consumo habitual",
+      "",
+      "Es la opción más práctica para todo el mes, con continuidad y sin complicarte.",
+    ].join("\n");
+  }
+
+  if (dailyCoffees === 2) {
+    return [
+      "Recomendación mensual:",
+      "- 1 bolsa de 500 g de Catuai",
+      "- 1 bolsa de 250 g de Pacamara si quieres más profundidad en sobremesa",
+      "",
+      "Así cubres el consumo mensual con una base versátil y una opción más gastronómica.",
+    ].join("\n");
+  }
+
+  return [
+    "Recomendación mensual:",
+    "- 2 bolsas de 250 g de Catuai",
+    "",
+    "Te cubre el consumo con un perfil amable, equilibrado y fácil de integrar a diario.",
+  ].join("\n");
+}
+
+function isMonthlyQuantityIntent(message: string): boolean {
+  const source = message.toLowerCase();
+
+  return (
+    source.includes("cuánto comprar") ||
+    source.includes("cuanto comprar") ||
+    source.includes("cantidad a comprar") ||
+    source.includes("mensualmente") ||
+    source.includes("al mes") ||
+    source.includes("consumo mensual") ||
+    source.includes("tomo") ||
+    source.includes("cafés al día") ||
+    source.includes("cafes al dia")
+  );
+}
+
+function extractDailyCoffeeCount(message: string): number | null {
+  const match = message.match(/(\d+)\s*caf[eé]s?\s+al\s+d[ií]a/);
+  if (!match) return null;
+
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
 }
 
 function buildFriendlySummary(
