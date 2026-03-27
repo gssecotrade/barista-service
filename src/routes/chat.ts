@@ -138,7 +138,7 @@ export async function chatRoutes(app: FastifyInstance) {
       mergedInputState.activeRecipe ??
       null;
 
-      const shouldShowProduct =
+    const shouldShowProduct =
       shouldReturnProduct({
         message,
         reply: baristaReply,
@@ -148,7 +148,11 @@ export async function chatRoutes(app: FastifyInstance) {
       !isCommercialClosingStep({
         message,
         reply: baristaReply,
-      });
+      }) &&
+      !isNonCommercialQuantityReply({
+        message,
+        reply: baristaReply,
+      }); 
 
     const resolvedProducts = shouldShowProduct
       ? resolveProductsFromReply({
@@ -587,6 +591,50 @@ function isCommercialClosingStep({
     );
 
   return userAskedForPurchasePlanning && assistantIsStillAskingToClose;
+}
+
+function isNonCommercialQuantityReply({
+  message,
+  reply,
+}: {
+  message: string;
+  reply: string;
+}): boolean {
+  const source = `${message} ${reply}`.toLowerCase();
+
+  const userAskedForPurchaseQuantity =
+    source.includes("cuánto comprar") ||
+    source.includes("cuanto comprar") ||
+    source.includes("cantidad") ||
+    source.includes("consumo mensual") ||
+    source.includes("consumo semanal") ||
+    source.includes("qué comprar") ||
+    source.includes("que comprar") ||
+    source.includes("qué me conviene comprar") ||
+    source.includes("que me conviene comprar") ||
+    source.includes("mensualmente") ||
+    source.includes("formato");
+
+  const replyLooksTechnicalInsteadOfCommercial =
+    reply.toLowerCase().includes("gramos por taza") ||
+    reply.toLowerCase().includes("10 gramos") ||
+    reply.toLowerCase().includes("840 gramos") ||
+    reply.toLowerCase().includes("270 gramos") ||
+    reply.toLowerCase().includes("300 gramos") ||
+    reply.toLowerCase().includes("estimación de consumo mensual") ||
+    reply.toLowerCase().includes("calculamos:");
+
+  const replyDoesNotUseCommercialFormats =
+    !reply.toLowerCase().includes("250 g") &&
+    !reply.toLowerCase().includes("500 g") &&
+    !reply.toLowerCase().includes("1 kg") &&
+    !reply.toLowerCase().includes("bolsa") &&
+    !reply.toLowerCase().includes("bolsas");
+
+  return (
+    userAskedForPurchaseQuantity &&
+    (replyLooksTechnicalInsteadOfCommercial || replyDoesNotUseCommercialFormats)
+  );
 }
 
 function buildFriendlySummary(
