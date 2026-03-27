@@ -643,54 +643,128 @@ function buildCommercialQuantityReply(message: string): string | null {
 
   const normalized = message.toLowerCase();
 
-  const wantsWeekendDifferentiation =
-    normalized.includes("fin de semana") ||
-    normalized.includes("fines de semana") ||
+  const weekdayDaily = extractWeekdayDailyCoffeeCount(normalized) ?? extractDailyCoffeeCount(normalized) ?? 3;
+  const weekendDaily = extractWeekendDailyCoffeeCount(normalized) ?? weekdayDaily;
+
+  const hasAfterMealMoment =
     normalized.includes("después de comer") ||
     normalized.includes("despues de comer") ||
+    normalized.includes("sobremesa");
+
+  const hasMidMorningMoment =
     normalized.includes("media mañana") ||
     normalized.includes("media manana");
 
-  const dailyCoffees = extractDailyCoffeeCount(normalized) ?? 3;
+  const wantsPremiumWeekend =
+    normalized.includes("fin de semana") ||
+    normalized.includes("fines de semana") ||
+    hasAfterMealMoment ||
+    hasMidMorningMoment;
 
-  // Regla comercial simple y robusta:
-  // - hasta 2 cafés/día: 2 bolsas de 250 g
-  // - 3 cafés/día con rutina semanal: 2 bolsas de 500 g
-  // - si además diferencia fin de semana/sobremesa: añadir 1 bolsa de 250 g premium
-  if (dailyCoffees >= 3 && wantsWeekendDifferentiation) {
+  const wantsSingleCoffee =
+    normalized.includes("una sola referencia") ||
+    normalized.includes("un solo café") ||
+    normalized.includes("un solo cafe") ||
+    normalized.includes("solo un café") ||
+    normalized.includes("solo un cafe");
+
+  const wantsTwoCoffees =
+    normalized.includes("combinar dos") ||
+    normalized.includes("dos referencias") ||
+    normalized.includes("dos cafés") ||
+    normalized.includes("dos cafes") ||
+    wantsPremiumWeekend;
+
+  const estimatedMonthlyCups = weekdayDaily * 20 + weekendDaily * 8;
+
+  // Conversión comercial simple.
+  // No se verbaliza cálculo; solo se usa para decidir formatos.
+  // Regla práctica:
+  // - consumo bajo: 2 x 250 g
+  // - consumo medio: 3 x 250 g o 1 x 500 g + 1 x 250 g
+  // - consumo alto: 2 x 500 g
+  // - si hay fin de semana premium: base diaria + complemento premium 250 g
+  if (wantsSingleCoffee) {
+    return buildSingleCoffeeMonthlyReply(estimatedMonthlyCups);
+  }
+
+  if (wantsTwoCoffees || wantsPremiumWeekend) {
+    if (estimatedMonthlyCups >= 95) {
+      if (hasAfterMealMoment) {
+        return [
+          "Recomendación mensual:",
+          "- 2 bolsas de 500 g de Catuai para el consumo diario",
+          "- 1 bolsa de 250 g de Pacamara para sobremesas y fines de semana",
+          "",
+          "Tienes una base práctica para diario y una referencia con más estructura para los momentos más gastronómicos.",
+        ].join("\n");
+      }
+
+      return [
+        "Recomendación mensual:",
+        "- 2 bolsas de 500 g de Catuai para el consumo diario",
+        "- 1 bolsa de 250 g de Geisha para media mañana o fines de semana",
+        "",
+        "Resuelves el mes con una base equilibrada y un café más especial para los momentos en los que quieras subir el nivel.",
+      ].join("\n");
+    }
+
+    if (estimatedMonthlyCups >= 70) {
+      if (hasAfterMealMoment) {
+        return [
+          "Recomendación mensual:",
+          "- 1 bolsa de 500 g de Catuai para diario",
+          "- 1 bolsa de 250 g de Catuai para reforzar entre semana",
+          "- 1 bolsa de 250 g de Pacamara para sobremesas y fin de semana",
+          "",
+          "Es una combinación muy equilibrada: cubres el consumo habitual y reservas un perfil con más carácter para los mejores momentos.",
+        ].join("\n");
+      }
+
+      return [
+        "Recomendación mensual:",
+        "- 1 bolsa de 500 g de Catuai para diario",
+        "- 1 bolsa de 250 g de Catuai para reforzar el mes",
+        "- 1 bolsa de 250 g de Geisha para momentos más especiales",
+        "",
+        "Así cubres el mes con comodidad y añades una referencia más refinada para salir de la rutina.",
+      ].join("\n");
+    }
+
     return [
       "Recomendación mensual:",
-      "- 2 bolsas de 500 g de Catuai para el consumo diario",
-      "- 1 bolsa de 250 g de Pacamara para sobremesas y fines de semana",
+      "- 2 bolsas de 250 g de Catuai para el consumo base",
+      "- 1 bolsa de 250 g de Geisha o Pacamara para variar el fin de semana",
       "",
-      "Tienes cubierto el mes con una base equilibrada y una referencia con más carácter.",
+      "Es la forma más sencilla de tener café diario y, al mismo tiempo, una referencia con más personalidad para los momentos especiales.",
     ].join("\n");
   }
 
-  if (dailyCoffees >= 3) {
+  // Caso por defecto: una base clara y fácil de comprar
+  if (estimatedMonthlyCups >= 95) {
     return [
       "Recomendación mensual:",
-      "- 2 bolsas de 500 g de Catuai para cubrir tu consumo habitual",
+      "- 2 bolsas de 500 g de Catuai",
       "",
-      "Es la opción más práctica para todo el mes, con continuidad y sin complicarte.",
+      "Es la opción más práctica para cubrir tu consumo mensual con continuidad, equilibrio y sin complicarte.",
     ].join("\n");
   }
 
-  if (dailyCoffees === 2) {
+  if (estimatedMonthlyCups >= 70) {
     return [
       "Recomendación mensual:",
       "- 1 bolsa de 500 g de Catuai",
-      "- 1 bolsa de 250 g de Pacamara si quieres más profundidad en sobremesa",
+      "- 1 bolsa de 250 g de Catuai",
       "",
-      "Así cubres el consumo mensual con una base versátil y una opción más gastronómica.",
+      "Cubres el mes con un perfil amable y versátil, en formatos cómodos de compra.",
     ].join("\n");
   }
 
   return [
     "Recomendación mensual:",
-    "- 2 bolsas de 250 g de Catuai",
+    "- 3 bolsas de 250 g de Catuai",
     "",
-    "Te cubre el consumo con un perfil amable, equilibrado y fácil de integrar a diario.",
+    "Tienes cubierto el mes con una compra simple, fácil de gestionar y con un café muy agradecido para diario.",
   ].join("\n");
 }
 
@@ -701,12 +775,18 @@ function isMonthlyQuantityIntent(message: string): boolean {
     source.includes("cuánto comprar") ||
     source.includes("cuanto comprar") ||
     source.includes("cantidad a comprar") ||
+    source.includes("qué cantidad comprar") ||
+    source.includes("que cantidad comprar") ||
     source.includes("mensualmente") ||
     source.includes("al mes") ||
     source.includes("consumo mensual") ||
+    source.includes("consumo semanal") ||
     source.includes("tomo") ||
     source.includes("cafés al día") ||
-    source.includes("cafes al dia")
+    source.includes("cafes al dia") ||
+    source.includes("rutina de consumo") ||
+    source.includes("qué me recomiendas comprar") ||
+    source.includes("que me recomiendas comprar")
   );
 }
 
@@ -716,6 +796,92 @@ function extractDailyCoffeeCount(message: string): number | null {
 
   const value = Number(match[1]);
   return Number.isFinite(value) ? value : null;
+}
+
+function extractWeekdayDailyCoffeeCount(message: string): number | null {
+  const patterns = [
+    /(\d+)\s*caf[eé]s?\s+al\s+d[ií]a\s+durante\s+la\s+semana/,
+    /(\d+)\s*caf[eé]s?\s+diarios?\s+entre\s+semana/,
+    /(\d+)\s*caf[eé]s?\s+por\s+d[ií]a\s+entre\s+semana/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match) {
+      const value = Number(match[1]);
+      if (Number.isFinite(value)) return value;
+    }
+  }
+
+  return null;
+}
+
+function extractWeekendDailyCoffeeCount(message: string): number | null {
+  const patterns = [
+    /fin(?:es)?\s+de\s+semana.*?(\d+)\s*(?:caf[eé]s?|uno|una|dos|tres|cuatro)/,
+    /(\d+)\s*caf[eé]s?\s+.*?fin(?:es)?\s+de\s+semana/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match) {
+      const raw = match[1];
+      const value = Number(raw);
+      if (Number.isFinite(value)) return value;
+    }
+  }
+
+  // Casos escritos con palabras
+  if (
+    message.includes("fin de semana uno") ||
+    message.includes("fines de semana uno")
+  ) {
+    return 1;
+  }
+
+  if (
+    message.includes("fin de semana dos") ||
+    message.includes("fines de semana dos")
+  ) {
+    return 2;
+  }
+
+  if (
+    message.includes("fin de semana tres") ||
+    message.includes("fines de semana tres")
+  ) {
+    return 3;
+  }
+
+  return null;
+}
+
+function buildSingleCoffeeMonthlyReply(estimatedMonthlyCups: number): string {
+  if (estimatedMonthlyCups >= 95) {
+    return [
+      "Recomendación mensual:",
+      "- 2 bolsas de 500 g de Catuai",
+      "",
+      "Es la opción más práctica si quieres resolver todo el mes con una sola referencia, equilibrada y fácil de disfrutar a diario.",
+    ].join("\n");
+  }
+
+  if (estimatedMonthlyCups >= 70) {
+    return [
+      "Recomendación mensual:",
+      "- 1 bolsa de 500 g de Catuai",
+      "- 1 bolsa de 250 g de Catuai",
+      "",
+      "Cubres el mes con una sola referencia, sin quedarte corto y manteniendo una compra muy sencilla.",
+    ].join("\n");
+  }
+
+  return [
+    "Recomendación mensual:",
+    "- 3 bolsas de 250 g de Catuai",
+    "",
+    "Te encaja muy bien si quieres una sola referencia y prefieres comprar en formatos más manejables.",
+  ].join("\n");
 }
 
 function buildFriendlySummary(
