@@ -617,10 +617,7 @@ function isNonCommercialQuantityReply({
 
   const replyLooksTechnicalInsteadOfCommercial =
     reply.toLowerCase().includes("gramos por taza") ||
-    reply.toLowerCase().includes("10 gramos") ||
-    reply.toLowerCase().includes("840 gramos") ||
-    reply.toLowerCase().includes("270 gramos") ||
-    reply.toLowerCase().includes("300 gramos") ||
+    /\d+\s*gramos/.test(reply.toLowerCase()) ||
     reply.toLowerCase().includes("estimación de consumo mensual") ||
     reply.toLowerCase().includes("calculamos:");
 
