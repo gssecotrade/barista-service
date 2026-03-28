@@ -14,6 +14,12 @@ export type ProfessionalVolumeResult = {
   totalGrams: number;
   totalKg: number;
   recommended1kgBags: number;
+  momentBreakdown: {
+    morning: number;
+    sobremesa: number;
+    evening: number;
+    other: number;
+  };
 };
 
 export type ProfessionalMixLine = {
@@ -89,7 +95,7 @@ export async function runBaristaDecisionEngine(params: {
     if (!parsed) return null;
 
     const calculated = calculateProfessionalCoffeeVolume(parsed);
-    const mix = await buildProfessionalMixRecommendation(calculated.totalKg);
+    const mix = await buildProfessionalMixRecommendation(calculated);
 
     return {
       type: "professional_volume",
@@ -165,47 +171,95 @@ export function isMonthlyQuantityIntent(message: string): boolean {
 }
 
 export function parseProfessionalVolumeQuery(message: string): {
-  coffeesPerDay: number;
-  days: number;
-  gramsPerCup: number;
-} | null {
-  const text = normalize(message);
-
-  const coffeesPerDay =
-    extractTotalCoffeesFromText(text) ??
-    extractNumberBefore(text, "cafes") ??
-    extractNumberBefore(text, "cafés") ??
-    extractNumberBefore(text, "tazas") ??
-    extractNumberBefore(text, "cafes diarios") ??
-    extractNumberBefore(text, "cafes al dia") ??
-    extractNumberBefore(text, "cafés al día");
-
-  if (!coffeesPerDay) return null;
-
-  let days = 30;
-
-  if (text.includes("cada 15 dias") || text.includes("cada 15 días")) {
-    days = 15;
-  } else if (text.includes("a la semana") || text.includes("por semana")) {
-    days = 7;
-  } else if (text.includes("al mes") || text.includes("mensual")) {
-    days = 30;
+    coffeesPerDay: number;
+    days: number;
+    gramsPerCup: number;
+    momentBreakdown: {
+      morning: number;
+      sobremesa: number;
+      evening: number;
+      other: number;
+    };
+  } | null {
+    const text = normalize(message);
+  
+    const declaredTotal =
+      extractDeclaredTotalCoffeesPerDay(text) ??
+      extractDailyCoffeeCount(text) ??
+      extractNumberBefore(text, "tazas") ??
+      extractNumberBefore(text, "cafes") ??
+      extractNumberBefore(text, "cafés");
+  
+    const morning = extractMomentCoffeeCount(text, [
+      "mañana",
+      "manana",
+      "matutino",
+      "matutina",
+      "desayuno",
+    ]);
+  
+    const sobremesa = extractMomentCoffeeCount(text, [
+      "sobremesa",
+      "despues de comer",
+      "después de comer",
+      "almuerzo",
+      "comida",
+    ]);
+  
+    const evening = extractMomentCoffeeCount(text, [
+      "tarde-noche",
+      "tarde noche",
+      "tarde",
+      "noche",
+    ]);
+  
+    const identifiedMoments = morning + sobremesa + evening;
+  
+    const coffeesPerDay =
+      declaredTotal ??
+      (identifiedMoments > 0 ? identifiedMoments : null) ??
+      extractTotalCoffeesFromText(text);
+  
+    if (!coffeesPerDay) return null;
+  
+    let days = 30;
+  
+    if (text.includes("cada 15 dias") || text.includes("cada 15 días")) {
+      days = 15;
+    } else if (text.includes("a la semana") || text.includes("por semana")) {
+      days = 7;
+    } else if (text.includes("al mes") || text.includes("mensual")) {
+      days = 30;
+    }
+  
+    const gramsPerCup =
+      extractExplicitGramsPerCup(text) ?? inferGramsPerCupFromContext(text) ?? 8;
+  
+    const other = Math.max(0, coffeesPerDay - identifiedMoments);
+  
+    return {
+      coffeesPerDay,
+      days,
+      gramsPerCup,
+      momentBreakdown: {
+        morning,
+        sobremesa,
+        evening,
+        other,
+      },
+    };
   }
-
-  const gramsPerCup =
-    extractExplicitGramsPerCup(text) ?? inferGramsPerCupFromContext(text) ?? 8;
-
-  return {
-    coffeesPerDay,
-    days,
-    gramsPerCup,
-  };
-}
 
 export function calculateProfessionalCoffeeVolume(input: {
   coffeesPerDay: number;
   days: number;
   gramsPerCup: number;
+  momentBreakdown: {
+    morning: number;
+    sobremesa: number;
+    evening: number;
+    other: number;
+  };
 }): ProfessionalVolumeResult {
   const cupsTotal = input.coffeesPerDay * input.days;
   const totalGrams = cupsTotal * input.gramsPerCup;
@@ -220,77 +274,78 @@ export function calculateProfessionalCoffeeVolume(input: {
     totalGrams,
     totalKg,
     recommended1kgBags,
+    momentBreakdown: input.momentBreakdown,
   };
 }
 
 export async function buildProfessionalMixRecommendation(
-  totalKg: number
-): Promise<ProfessionalMixResult | null> {
-  const mix = buildMixPercentages(totalKg);
-
-  const entries = await Promise.all(
-    (Object.entries(mix) as Array<[CoffeeHandle, number]>).map(
-      async ([handle, percentage]) => {
-        if (percentage <= 0) return null;
-
-        const targetKg = totalKg * percentage;
-        const variants = await getShopifyVariantsForHandle(handle);
-        const preferred = pickPreferredProfessionalVariant(variants);
-
-        if (!preferred) return null;
-
-        const bagCount = Math.max(
-          1,
-          Math.ceil((targetKg * 1000) / preferred.bagSizeGrams)
-        );
-
-        const totalB2C = roundMoney(preferred.priceB2C * bagCount);
-        const totalB2B = roundMoney(preferred.priceB2B * bagCount);
-
-        return {
-          handle,
-          name: coffeeNames[handle],
-          percentage,
-          targetKg: roundToOneDecimal(targetKg),
-          bagSizeGrams: preferred.bagSizeGrams,
-          bagCount,
-          variantId: preferred.id,
-          priceB2CPerBag: preferred.priceB2C,
-          priceB2BPerBag: preferred.priceB2B,
-          totalB2C,
-          totalB2B,
-        } satisfies ProfessionalMixLine;
-      }
-    )
-  );
-
-  const lines = entries.filter(Boolean) as ProfessionalMixLine[];
-
-  if (!lines.length) return null;
-
-  const totalEstimatedB2B = roundMoney(
-    lines.reduce((sum, line) => sum + line.totalB2B, 0)
-  );
-  const totalEstimatedB2C = roundMoney(
-    lines.reduce((sum, line) => sum + line.totalB2C, 0)
-  );
-
-  const cartParts = lines
-    .filter((line) => line.variantId && line.bagCount > 0)
-    .map((line) => `${line.variantId}:${line.bagCount}`);
-
-  const cartUrl = cartParts.length
-    ? `${SHOPIFY_BASE_URL}/cart/${cartParts.join(",")}`
-    : null;
-
-  return {
-    totalKg: roundToOneDecimal(totalKg),
-    lines,
-    totalEstimatedB2B,
-    totalEstimatedB2C,
-    cartUrl,
-  };
-}
+    result: ProfessionalVolumeResult
+  ): Promise<ProfessionalMixResult | null> {
+    const mix = buildMomentBasedMix(result);
+  
+    const entries = await Promise.all(
+      (Object.entries(mix) as Array<[CoffeeHandle, number]>).map(
+        async ([handle, percentage]) => {
+          if (percentage <= 0) return null;
+  
+          const targetKg = result.totalKg * percentage;
+          const variants = await getShopifyVariantsForHandle(handle);
+          const preferred = pickPreferredProfessionalVariant(variants);
+  
+          if (!preferred) return null;
+  
+          const bagCount = Math.max(
+            1,
+            Math.ceil((targetKg * 1000) / preferred.bagSizeGrams)
+          );
+  
+          const totalB2C = roundMoney(preferred.priceB2C * bagCount);
+          const totalB2B = roundMoney(preferred.priceB2B * bagCount);
+  
+          return {
+            handle,
+            name: coffeeNames[handle],
+            percentage,
+            targetKg: roundToOneDecimal(targetKg),
+            bagSizeGrams: preferred.bagSizeGrams,
+            bagCount,
+            variantId: preferred.id,
+            priceB2CPerBag: preferred.priceB2C,
+            priceB2BPerBag: preferred.priceB2B,
+            totalB2C,
+            totalB2B,
+          } satisfies ProfessionalMixLine;
+        }
+      )
+    );
+  
+    const lines = entries.filter(Boolean) as ProfessionalMixLine[];
+  
+    if (!lines.length) return null;
+  
+    const totalEstimatedB2B = roundMoney(
+      lines.reduce((sum, line) => sum + line.totalB2B, 0)
+    );
+    const totalEstimatedB2C = roundMoney(
+      lines.reduce((sum, line) => sum + line.totalB2C, 0)
+    );
+  
+    const cartParts = lines
+      .filter((line) => line.variantId && line.bagCount > 0)
+      .map((line) => `${line.variantId}:${line.bagCount}`);
+  
+    const cartUrl = cartParts.length
+      ? `${SHOPIFY_BASE_URL}/cart/${cartParts.join(",")}`
+      : null;
+  
+    return {
+      totalKg: roundToOneDecimal(result.totalKg),
+      lines,
+      totalEstimatedB2B,
+      totalEstimatedB2C,
+      cartUrl,
+    };
+  }
 
 export function buildProfessionalVolumeReply(
     result: ProfessionalVolumeResult,
@@ -326,29 +381,48 @@ export function buildProfessionalVolumeReply(
     return lines.join("\n");
   }
 
-function buildMixPercentages(totalKg: number): Record<CoffeeHandle, number> {
-  if (totalKg >= 40) {
+  function buildMomentBasedMix(
+    result: ProfessionalVolumeResult
+  ): Record<CoffeeHandle, number> {
+    const { morning, sobremesa, evening, other } = result.momentBreakdown;
+  
+    const totalAssigned = morning + sobremesa + evening + other;
+  
+    if (totalAssigned > 0) {
+      const catuaiCups = morning + other;
+      const pacamaraCups = sobremesa;
+      const geishaCups = evening;
+  
+      return {
+        catuai: catuaiCups / totalAssigned,
+        pacamara: pacamaraCups / totalAssigned,
+        geisha: geishaCups / totalAssigned,
+      };
+    }
+  
+    // fallback si no hay desglose por momentos
+    if (result.totalKg >= 40) {
+      return {
+        catuai: 0.7,
+        pacamara: 0.2,
+        geisha: 0.1,
+      };
+    }
+  
+    if (result.totalKg >= 20) {
+      return {
+        catuai: 0.75,
+        pacamara: 0.2,
+        geisha: 0.05,
+      };
+    }
+  
     return {
-      catuai: 0.7,
+      catuai: 0.8,
       pacamara: 0.2,
-      geisha: 0.1,
+      geisha: 0,
     };
   }
-
-  if (totalKg >= 20) {
-    return {
-      catuai: 0.75,
-      pacamara: 0.2,
-      geisha: 0.05,
-    };
-  }
-
-  return {
-    catuai: 0.8,
-    pacamara: 0.2,
-    geisha: 0,
-  };
-}
 
 export function buildCommercialQuantityReplyAdvanced(message: string): string | null {
   const normalized = normalize(message);
@@ -536,6 +610,46 @@ function extractTotalCoffeesFromText(message: string): number | null {
 
   return total > 0 ? total : null;
 }
+
+function extractDeclaredTotalCoffeesPerDay(text: string): number | null {
+    const patterns = [
+      /sirvo\s+(\d+)\s+(?:tazas?|caf(?:e|é)s?)/i,
+      /(\d+)\s+(?:tazas?|caf(?:e|é)s?)\s+(?:de café\s+)?diari[oa]s?/i,
+      /(\d+)\s+(?:tazas?|caf(?:e|é)s?)\s+al\s+d[ií]a/i,
+    ];
+  
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const value = Number(match[1]);
+        if (Number.isFinite(value)) return value;
+      }
+    }
+  
+    return null;
+  }
+  
+  function extractMomentCoffeeCount(text: string, keywords: string[]): number {
+    for (const keyword of keywords) {
+      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  
+      const patterns = [
+        new RegExp(`${escaped}[^\\d]{0,20}(\\d+)\\s*(?:caf(?:e|é)s?|tazas?)`, "i"),
+        new RegExp(`(\\d+)\\s*(?:caf(?:e|é)s?|tazas?)[^\\.\\n]{0,30}${escaped}`, "i"),
+        new RegExp(`${escaped}[^\\d]{0,20}unos\\s*(\\d+)`, "i"),
+      ];
+  
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match) {
+          const value = Number(match[1]);
+          if (Number.isFinite(value)) return value;
+        }
+      }
+    }
+  
+    return 0;
+  }
 
 function extractDailyCoffeeCount(message: string): number | null {
   const match = message.match(/(\d+)\s*caf(?:e|é)s?\s+al\s+d(?:i|í)a/);
