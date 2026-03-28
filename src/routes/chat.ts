@@ -8,6 +8,10 @@ import {
   mergeBaristaState,
   normalizeBaristaState,
 } from "../services/barista-state.service";
+import {
+  buildCupEconomicsReply,
+  isCupEconomicsIntent,
+} from "../services/barista-pricing.service";
 
 const chatBodySchema = z.object({
   userId: z.string().min(1),
@@ -118,10 +122,13 @@ export async function chatRoutes(app: FastifyInstance) {
     });
     
     const forcedCommercialReply = buildCommercialQuantityReply(message);
+    const forcedEconomicsReply = await buildCupEconomicsReply({ message });
     
-    const safeReply = sanitizeForbiddenContent(rawBaristaReply);
-    const baristaReply = forcedCommercialReply || safeReply;
-
+    const safeReply = isCupEconomicsIntent(message)
+      ? rawBaristaReply
+      : sanitizeForbiddenContent(rawBaristaReply);
+    
+    const baristaReply = forcedEconomicsReply || forcedCommercialReply || safeReply;
     const inferredCoffee =
       inferCoffeeFromText(`${message} ${baristaReply}`) ??
       normalizeCoffeeValue(updatedContext?.lastCoffee ?? null) ??
