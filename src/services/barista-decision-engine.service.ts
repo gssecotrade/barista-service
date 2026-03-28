@@ -1,5 +1,12 @@
 type CoffeeHandle = "catuai" | "pacamara" | "geisha";
 
+type BusinessMode =
+  | "restaurant"
+  | "fine_dining"
+  | "cafeteria"
+  | "hotel"
+  | "generic_horeca";
+
 export type BaristaDecisionIntent =
   | "professional_volume"
   | "cup_economics"
@@ -14,6 +21,7 @@ export type ProfessionalVolumeResult = {
   totalGrams: number;
   totalKg: number;
   recommended1kgBags: number;
+  businessMode: BusinessMode;
   momentBreakdown: {
     morning: number;
     sobremesa: number;
@@ -134,7 +142,10 @@ export function isProfessionalVolumeIntent(text: string): boolean {
       text.includes("cafetería") ||
       text.includes("hotel") ||
       text.includes("horeca") ||
-      text.includes("sirvo")) &&
+      text.includes("sirvo") ||
+      text.includes("fine dining") ||
+      text.includes("degustacion") ||
+      text.includes("degustación")) &&
     (text.includes("cafes") ||
       text.includes("cafés") ||
       text.includes("tazas") ||
@@ -171,89 +182,96 @@ export function isMonthlyQuantityIntent(message: string): boolean {
 }
 
 export function parseProfessionalVolumeQuery(message: string): {
-    coffeesPerDay: number;
-    days: number;
-    gramsPerCup: number;
-    momentBreakdown: {
-      morning: number;
-      sobremesa: number;
-      evening: number;
-      other: number;
-    };
-  } | null {
-    const text = normalize(message);
-  
-    const declaredTotal =
-      extractDeclaredTotalCoffeesPerDay(text) ??
-      extractDailyCoffeeCount(text) ??
-      extractNumberBefore(text, "tazas") ??
-      extractNumberBefore(text, "cafes") ??
-      extractNumberBefore(text, "cafés");
-  
-    const morning = extractMomentCoffeeCount(text, [
-      "mañana",
-      "manana",
-      "matutino",
-      "matutina",
-      "desayuno",
-    ]);
-  
-    const sobremesa = extractMomentCoffeeCount(text, [
-      "sobremesa",
-      "despues de comer",
-      "después de comer",
-      "almuerzo",
-      "comida",
-    ]);
-  
-    const evening = extractMomentCoffeeCount(text, [
-      "tarde-noche",
-      "tarde noche",
-      "tarde",
-      "noche",
-    ]);
-  
-    const identifiedMoments = morning + sobremesa + evening;
-  
-    const coffeesPerDay =
-      declaredTotal ??
-      (identifiedMoments > 0 ? identifiedMoments : null) ??
-      extractTotalCoffeesFromText(text);
-  
-    if (!coffeesPerDay) return null;
-  
-    let days = 30;
-  
-    if (text.includes("cada 15 dias") || text.includes("cada 15 días")) {
-      days = 15;
-    } else if (text.includes("a la semana") || text.includes("por semana")) {
-      days = 7;
-    } else if (text.includes("al mes") || text.includes("mensual")) {
-      days = 30;
-    }
-  
-    const gramsPerCup =
-      extractExplicitGramsPerCup(text) ?? inferGramsPerCupFromContext(text) ?? 8;
-  
-    const other = Math.max(0, coffeesPerDay - identifiedMoments);
-  
-    return {
-      coffeesPerDay,
-      days,
-      gramsPerCup,
-      momentBreakdown: {
-        morning,
-        sobremesa,
-        evening,
-        other,
-      },
-    };
+  coffeesPerDay: number;
+  days: number;
+  gramsPerCup: number;
+  businessMode: BusinessMode;
+  momentBreakdown: {
+    morning: number;
+    sobremesa: number;
+    evening: number;
+    other: number;
+  };
+} | null {
+  const text = normalize(message);
+
+  const declaredTotal =
+    extractDeclaredTotalCoffeesPerDay(text) ??
+    extractDailyCoffeeCount(text) ??
+    extractNumberBefore(text, "tazas") ??
+    extractNumberBefore(text, "cafes") ??
+    extractNumberBefore(text, "cafés");
+
+  const morning = extractMomentCoffeeCount(text, [
+    "mañana",
+    "manana",
+    "matutino",
+    "matutina",
+    "desayuno",
+    "por la mañana",
+    "por la manana",
+  ]);
+
+  const sobremesa = extractMomentCoffeeCount(text, [
+    "sobremesa",
+    "despues de comer",
+    "después de comer",
+    "almuerzo",
+    "comida",
+  ]);
+
+  const evening = extractMomentCoffeeCount(text, [
+    "tarde-noche",
+    "tarde noche",
+    "tarde",
+    "noche",
+    "tarde noche",
+  ]);
+
+  const identifiedMoments = morning + sobremesa + evening;
+
+  const coffeesPerDay =
+    declaredTotal ??
+    (identifiedMoments > 0 ? identifiedMoments : null) ??
+    extractTotalCoffeesFromText(text);
+
+  if (!coffeesPerDay) return null;
+
+  let days = 30;
+
+  if (text.includes("cada 15 dias") || text.includes("cada 15 días")) {
+    days = 15;
+  } else if (text.includes("a la semana") || text.includes("por semana")) {
+    days = 7;
+  } else if (text.includes("al mes") || text.includes("mensual")) {
+    days = 30;
   }
+
+  const gramsPerCup =
+    extractExplicitGramsPerCup(text) ?? inferGramsPerCupFromContext(text) ?? 8;
+
+  const other = Math.max(0, coffeesPerDay - identifiedMoments);
+  const businessMode = detectBusinessMode(text);
+
+  return {
+    coffeesPerDay,
+    days,
+    gramsPerCup,
+    businessMode,
+    momentBreakdown: {
+      morning,
+      sobremesa,
+      evening,
+      other,
+    },
+  };
+}
 
 export function calculateProfessionalCoffeeVolume(input: {
   coffeesPerDay: number;
   days: number;
   gramsPerCup: number;
+  businessMode: BusinessMode;
   momentBreakdown: {
     morning: number;
     sobremesa: number;
@@ -274,169 +292,266 @@ export function calculateProfessionalCoffeeVolume(input: {
     totalGrams,
     totalKg,
     recommended1kgBags,
+    businessMode: input.businessMode,
     momentBreakdown: input.momentBreakdown,
   };
 }
 
 export async function buildProfessionalMixRecommendation(
-    result: ProfessionalVolumeResult
-  ): Promise<ProfessionalMixResult | null> {
-    const mix = buildMomentBasedMix(result);
-  
-    const entries = await Promise.all(
-      (Object.entries(mix) as Array<[CoffeeHandle, number]>).map(
-        async ([handle, percentage]) => {
-          if (percentage <= 0) return null;
-  
-          const targetKg = result.totalKg * percentage;
-          const variants = await getShopifyVariantsForHandle(handle);
-          const preferred = pickPreferredProfessionalVariant(variants);
-  
-          if (!preferred) return null;
-  
-          const bagCount = Math.max(
-            1,
-            Math.ceil((targetKg * 1000) / preferred.bagSizeGrams)
-          );
-  
-          const totalB2C = roundMoney(preferred.priceB2C * bagCount);
-          const totalB2B = roundMoney(preferred.priceB2B * bagCount);
-  
-          return {
-            handle,
-            name: coffeeNames[handle],
-            percentage,
-            targetKg: roundToOneDecimal(targetKg),
-            bagSizeGrams: preferred.bagSizeGrams,
-            bagCount,
-            variantId: preferred.id,
-            priceB2CPerBag: preferred.priceB2C,
-            priceB2BPerBag: preferred.priceB2B,
-            totalB2C,
-            totalB2B,
-          } satisfies ProfessionalMixLine;
-        }
-      )
-    );
-  
-    const lines = entries.filter(Boolean) as ProfessionalMixLine[];
-  
-    if (!lines.length) return null;
-  
-    const totalEstimatedB2B = roundMoney(
-      lines.reduce((sum, line) => sum + line.totalB2B, 0)
-    );
-    const totalEstimatedB2C = roundMoney(
-      lines.reduce((sum, line) => sum + line.totalB2C, 0)
-    );
-  
-    const cartParts = lines
-      .filter((line) => line.variantId && line.bagCount > 0)
-      .map((line) => `${line.variantId}:${line.bagCount}`);
-  
-    const cartUrl = cartParts.length
-      ? `${SHOPIFY_BASE_URL}/cart/${cartParts.join(",")}`
-      : null;
-  
-    return {
-      totalKg: roundToOneDecimal(result.totalKg),
-      lines,
-      totalEstimatedB2B,
-      totalEstimatedB2C,
-      cartUrl,
-    };
-  }
+  result: ProfessionalVolumeResult
+): Promise<ProfessionalMixResult | null> {
+  const mix = buildMomentBasedMix(result);
+
+  const entries = await Promise.all(
+    (Object.entries(mix) as Array<[CoffeeHandle, number]>).map(
+      async ([handle, percentage]) => {
+        if (percentage < 0.01) return null;
+
+        const targetKg = result.totalKg * percentage;
+        const variants = await getShopifyVariantsForHandle(handle);
+        const preferred = pickPreferredProfessionalVariant(variants);
+
+        if (!preferred) return null;
+
+        const bagCount = Math.max(
+          1,
+          Math.ceil((targetKg * 1000) / preferred.bagSizeGrams)
+        );
+
+        const totalB2C = roundMoney(preferred.priceB2C * bagCount);
+        const totalB2B = roundMoney(preferred.priceB2B * bagCount);
+
+        return {
+          handle,
+          name: coffeeNames[handle],
+          percentage,
+          targetKg: roundToOneDecimal(targetKg),
+          bagSizeGrams: preferred.bagSizeGrams,
+          bagCount,
+          variantId: preferred.id,
+          priceB2CPerBag: preferred.priceB2C,
+          priceB2BPerBag: preferred.priceB2B,
+          totalB2C,
+          totalB2B,
+        } satisfies ProfessionalMixLine;
+      }
+    )
+  );
+
+  const lines = entries.filter(Boolean) as ProfessionalMixLine[];
+
+  if (!lines.length) return null;
+
+  const totalEstimatedB2B = roundMoney(
+    lines.reduce((sum, line) => sum + line.totalB2B, 0)
+  );
+  const totalEstimatedB2C = roundMoney(
+    lines.reduce((sum, line) => sum + line.totalB2C, 0)
+  );
+
+  const cartParts = lines
+    .filter((line) => line.variantId && line.bagCount > 0)
+    .map((line) => `${line.variantId}:${line.bagCount}`);
+
+  const cartUrl = cartParts.length
+    ? `${SHOPIFY_BASE_URL}/cart/${cartParts.join(",")}`
+    : null;
+
+  return {
+    totalKg: roundToOneDecimal(result.totalKg),
+    lines,
+    totalEstimatedB2B,
+    totalEstimatedB2C,
+    cartUrl,
+  };
+}
 
 export function buildProfessionalVolumeReply(
-    result: ProfessionalVolumeResult,
-    mix: ProfessionalMixResult | null
-  ): string {
-    const periodLabel =
-      result.days === 15
-        ? "cada 15 días"
-        : result.days === 7
-        ? "por semana"
-        : "al mes";
-  
-    const lines: string[] = [
-      `Necesitarías aproximadamente ${formatKg(result.totalKg)} de café ${periodLabel}.`,
-      "",
-    ];
-  
-    if (mix?.lines.length) {
-      lines.push("Propuesta de variedades:");
-  
-      mix.lines.forEach((line) => {
-        lines.push(
-          `- ${line.name}: ${line.bagCount} bolsas de ${formatBagSize(line.bagSizeGrams)} (${Math.round(line.percentage * 100)}%)`
-        );
-      });
-    } else {
+  result: ProfessionalVolumeResult,
+  mix: ProfessionalMixResult | null
+): string {
+  const periodLabel =
+    result.days === 15
+      ? "cada 15 días"
+      : result.days === 7
+      ? "por semana"
+      : "al mes";
+
+  const lines: string[] = [
+    `Necesitarías aproximadamente ${formatKg(result.totalKg)} de café ${periodLabel}.`,
+    "",
+  ];
+
+  if (mix?.lines.length) {
+    lines.push("Propuesta de variedades:");
+
+    mix.lines.forEach((line) => {
       lines.push(
-        "Formato recomendado:",
-        `- ${result.recommended1kgBags} bolsas de 1 kg`
+        `- ${line.name}: ${line.bagCount} bolsas de ${formatBagSize(line.bagSizeGrams)} (${Math.round(line.percentage * 100)}%)`
       );
-    }
-  
-    return lines.join("\n");
+    });
+
+    lines.push("", `Enfoque recomendado: ${getBusinessModeLabel(result.businessMode)}.`);
+  } else {
+    lines.push(
+      "Formato recomendado:",
+      `- ${result.recommended1kgBags} bolsas de 1 kg`
+    );
   }
 
-  function buildMomentBasedMix(
-    result: ProfessionalVolumeResult
-  ): Record<CoffeeHandle, number> {
-    const { morning, sobremesa, evening, other } = result.momentBreakdown;
-  
-    const totalAssigned = morning + sobremesa + evening + other;
-  
-    if (totalAssigned > 0) {
-      // Reparto por rol de consumo, no solo por volumen bruto
-      const catuaiWeighted =
+  return lines.join("\n");
+}
+
+function buildMomentBasedMix(
+  result: ProfessionalVolumeResult
+): Record<CoffeeHandle, number> {
+  const { morning, sobremesa, evening, other } = result.momentBreakdown;
+
+  const totalAssigned = morning + sobremesa + evening + other;
+
+  if (totalAssigned > 0) {
+    const roleWeighted = {
+      catuai:
         morning * 0.85 +
         sobremesa * 0.15 +
         evening * 0.1 +
-        other * 1.0;
-  
-      const pacamaraWeighted =
+        other * 1.0,
+      pacamara:
         morning * 0.1 +
         sobremesa * 0.7 +
         evening * 0.2 +
-        other * 0.0;
-  
-      const geishaWeighted =
+        other * 0.0,
+      geisha:
         morning * 0.05 +
         sobremesa * 0.15 +
         evening * 0.7 +
-        other * 0.0;
-  
-      const totalWeighted =
-        catuaiWeighted + pacamaraWeighted + geishaWeighted;
-  
-      if (totalWeighted > 0) {
-        return normalizeMix({
-          catuai: catuaiWeighted / totalWeighted,
-          pacamara: pacamaraWeighted / totalWeighted,
-          geisha: geishaWeighted / totalWeighted,
-        });
-      }
+        other * 0.0,
+    };
+
+    const businessAdjusted = applyBusinessModeBias(
+      normalizeMix(roleWeighted),
+      result.businessMode
+    );
+
+    let mix = normalizeMix(businessAdjusted);
+
+    if (result.totalKg >= 20) {
+      if (mix.pacamara < 0.1) mix.pacamara = 0.1;
+      if (mix.geisha < 0.05) mix.geisha = 0.05;
     }
-  
-    // fallback si no hay desglose por momentos
-    if (result.totalKg >= 40) {
+
+    mix = normalizeMix(mix);
+
+    return mix;
+  }
+
+  const fallback = getFallbackMixByBusinessMode(result);
+  return normalizeMix(fallback);
+}
+
+function applyBusinessModeBias(
+  mix: Record<CoffeeHandle, number>,
+  businessMode: BusinessMode
+): Record<CoffeeHandle, number> {
+  switch (businessMode) {
+    case "fine_dining":
       return {
-        catuai: 0.7,
-        pacamara: 0.2,
+        catuai: mix.catuai * 0.9,
+        pacamara: mix.pacamara * 1.05,
+        geisha: mix.geisha * 1.35,
+      };
+
+    case "cafeteria":
+      return {
+        catuai: mix.catuai * 1.25,
+        pacamara: mix.pacamara * 0.95,
+        geisha: mix.geisha * 0.65,
+      };
+
+    case "hotel":
+      return {
+        catuai: mix.catuai * 0.95,
+        pacamara: mix.pacamara * 1.25,
+        geisha: mix.geisha * 0.9,
+      };
+
+    case "restaurant":
+      return {
+        catuai: mix.catuai * 1.0,
+        pacamara: mix.pacamara * 1.1,
+        geisha: mix.geisha * 0.95,
+      };
+
+    case "generic_horeca":
+    default:
+      return mix;
+  }
+}
+
+function getFallbackMixByBusinessMode(
+  result: ProfessionalVolumeResult
+): Record<CoffeeHandle, number> {
+  switch (result.businessMode) {
+    case "fine_dining":
+      return {
+        catuai: 0.5,
+        pacamara: 0.25,
+        geisha: 0.25,
+      };
+
+    case "cafeteria":
+      return {
+        catuai: 0.8,
+        pacamara: 0.17,
+        geisha: 0.03,
+      };
+
+    case "hotel":
+      return {
+        catuai: 0.6,
+        pacamara: 0.3,
         geisha: 0.1,
       };
-    }
-  
-    if (result.totalKg >= 20) {
+
+    case "restaurant":
       return {
-        catuai: 0.75,
-        pacamara: 0.2,
-        geisha: 0.05,
+        catuai: 0.65,
+        pacamara: 0.25,
+        geisha: 0.1,
       };
-    }
-  
+
+    case "generic_horeca":
+    default:
+      if (result.totalKg >= 40) {
+        return {
+          catuai: 0.7,
+          pacamara: 0.2,
+          geisha: 0.1,
+        };
+      }
+
+      if (result.totalKg >= 20) {
+        return {
+          catuai: 0.75,
+          pacamara: 0.2,
+          geisha: 0.05,
+        };
+      }
+
+      return {
+        catuai: 0.8,
+        pacamara: 0.2,
+        geisha: 0,
+      };
+  }
+}
+
+function normalizeMix(
+  mix: Record<CoffeeHandle, number>
+): Record<CoffeeHandle, number> {
+  const total = Object.values(mix).reduce((sum, value) => sum + value, 0);
+
+  if (total <= 0) {
     return {
       catuai: 0.8,
       pacamara: 0.2,
@@ -444,25 +559,59 @@ export function buildProfessionalVolumeReply(
     };
   }
 
-  function normalizeMix(
-    mix: Record<CoffeeHandle, number>
-  ): Record<CoffeeHandle, number> {
-    const total = Object.values(mix).reduce((sum, value) => sum + value, 0);
-  
-    if (total <= 0) {
-      return {
-        catuai: 0.8,
-        pacamara: 0.2,
-        geisha: 0,
-      };
-    }
-  
-    return {
-      catuai: mix.catuai / total,
-      pacamara: mix.pacamara / total,
-      geisha: mix.geisha / total,
-    };
+  return {
+    catuai: mix.catuai / total,
+    pacamara: mix.pacamara / total,
+    geisha: mix.geisha / total,
+  };
+}
+
+function detectBusinessMode(text: string): BusinessMode {
+  if (
+    text.includes("fine dining") ||
+    text.includes("alta cocina") ||
+    text.includes("gastronomico") ||
+    text.includes("gastronómico") ||
+    text.includes("menu degustacion") ||
+    text.includes("menú degustación")
+  ) {
+    return "fine_dining";
   }
+
+  if (
+    text.includes("cafeteria") ||
+    text.includes("cafetería") ||
+    text.includes("coffee shop")
+  ) {
+    return "cafeteria";
+  }
+
+  if (text.includes("hotel")) {
+    return "hotel";
+  }
+
+  if (text.includes("restaurante")) {
+    return "restaurant";
+  }
+
+  return "generic_horeca";
+}
+
+function getBusinessModeLabel(mode: BusinessMode): string {
+  switch (mode) {
+    case "fine_dining":
+      return "más peso en referencias premium y de diferenciación";
+    case "cafeteria":
+      return "más peso en continuidad operativa y rotación";
+    case "hotel":
+      return "más peso en equilibrio y sobremesa";
+    case "restaurant":
+      return "equilibrio entre base diaria y propuesta gastronómica";
+    case "generic_horeca":
+    default:
+      return "mix equilibrado para operativa profesional";
+  }
+}
 
 export function buildCommercialQuantityReplyAdvanced(message: string): string | null {
   const normalized = normalize(message);
@@ -652,12 +801,33 @@ function extractTotalCoffeesFromText(message: string): number | null {
 }
 
 function extractDeclaredTotalCoffeesPerDay(text: string): number | null {
+  const patterns = [
+    /sirvo\s+(\d+)\s+(?:tazas?|caf(?:e|é)s?)/i,
+    /(\d+)\s+(?:tazas?|caf(?:e|é)s?)\s+(?:de café\s+)?diari[oa]s?/i,
+    /(\d+)\s+(?:tazas?|caf(?:e|é)s?)\s+al\s+d[ií]a/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const value = Number(match[1]);
+      if (Number.isFinite(value)) return value;
+    }
+  }
+
+  return null;
+}
+
+function extractMomentCoffeeCount(text: string, keywords: string[]): number {
+  for (const keyword of keywords) {
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
     const patterns = [
-      /sirvo\s+(\d+)\s+(?:tazas?|caf(?:e|é)s?)/i,
-      /(\d+)\s+(?:tazas?|caf(?:e|é)s?)\s+(?:de café\s+)?diari[oa]s?/i,
-      /(\d+)\s+(?:tazas?|caf(?:e|é)s?)\s+al\s+d[ií]a/i,
+      new RegExp(`${escaped}[^\\d]{0,24}(\\d+)\\s*(?:caf(?:e|é)s?|tazas?)`, "i"),
+      new RegExp(`(\\d+)\\s*(?:caf(?:e|é)s?|tazas?)[^\\.\\n]{0,36}${escaped}`, "i"),
+      new RegExp(`${escaped}[^\\d]{0,24}unos\\s*(\\d+)`, "i"),
     ];
-  
+
     for (const pattern of patterns) {
       const match = text.match(pattern);
       if (match) {
@@ -665,31 +835,10 @@ function extractDeclaredTotalCoffeesPerDay(text: string): number | null {
         if (Number.isFinite(value)) return value;
       }
     }
-  
-    return null;
   }
-  
-  function extractMomentCoffeeCount(text: string, keywords: string[]): number {
-    for (const keyword of keywords) {
-      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  
-      const patterns = [
-        new RegExp(`${escaped}[^\\d]{0,20}(\\d+)\\s*(?:caf(?:e|é)s?|tazas?)`, "i"),
-        new RegExp(`(\\d+)\\s*(?:caf(?:e|é)s?|tazas?)[^\\.\\n]{0,30}${escaped}`, "i"),
-        new RegExp(`${escaped}[^\\d]{0,20}unos\\s*(\\d+)`, "i"),
-      ];
-  
-      for (const pattern of patterns) {
-        const match = text.match(pattern);
-        if (match) {
-          const value = Number(match[1]);
-          if (Number.isFinite(value)) return value;
-        }
-      }
-    }
-  
-    return 0;
-  }
+
+  return 0;
+}
 
 function extractDailyCoffeeCount(message: string): number | null {
   const match = message.match(/(\d+)\s*caf(?:e|é)s?\s+al\s+d(?:i|í)a/);
