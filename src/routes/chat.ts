@@ -123,6 +123,8 @@ export async function chatRoutes(app: FastifyInstance) {
     });
     
     const engineResult = await runBaristaDecisionEngine({ message });
+    const suppressProductCardsForProfessionalVolume =
+      engineResult?.type === "professional_volume";
 
     const forcedCommercialReply = buildCommercialQuantityReply(message);
     const forcedEconomicsReply = await buildCupEconomicsReply({ message });
@@ -136,7 +138,7 @@ export async function chatRoutes(app: FastifyInstance) {
       forcedEconomicsReply ||
       forcedCommercialReply ||
       safeReply;
-      
+
     const inferredCoffee =
       inferCoffeeFromText(`${message} ${baristaReply}`) ??
       normalizeCoffeeValue(updatedContext?.lastCoffee ?? null) ??
@@ -172,7 +174,9 @@ export async function chatRoutes(app: FastifyInstance) {
       !isNonCommercialQuantityReply({
         message,
         reply: baristaReply,
-      }); 
+      }) && 
+      !suppressProductCardsForProfessionalVolume; 
+
 
     const resolvedProducts = shouldShowProduct
       ? resolveProductsFromReply({
@@ -806,12 +810,19 @@ function isMonthlyQuantityIntent(message: string): boolean {
   );
 }
 
-function extractDailyCoffeeCount(message: string): number | null {
-  const match = message.match(/(\d+)\s*caf[eé]s?\s+al\s+d[ií]a/);
-  if (!match) return null;
+function extractTotalCoffeesFromText(message: string): number | null {
+  const matches = message.match(/(\d+)\s*caf(?:e|é)s?/gi);
 
-  const value = Number(match[1]);
-  return Number.isFinite(value) ? value : null;
+  if (!matches) return null;
+
+  let total = 0;
+
+  for (const m of matches) {
+    const num = Number(m.replace(/[^\d]/g, ""));
+    if (Number.isFinite(num)) total += num;
+  }
+
+  return total > 0 ? total : null;
 }
 
 function extractWeekdayDailyCoffeeCount(message: string): number | null {

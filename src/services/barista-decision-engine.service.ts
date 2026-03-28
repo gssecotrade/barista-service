@@ -1,4 +1,4 @@
-import { buildCupEconomicsReply, isCupEconomicsIntent } from "./barista-pricing.service";
+type CoffeeHandle = "catuai" | "pacamara" | "geisha";
 
 export type BaristaDecisionIntent =
   | "professional_volume"
@@ -16,15 +16,34 @@ export type ProfessionalVolumeResult = {
   recommended1kgBags: number;
 };
 
+export type ProfessionalMixLine = {
+  handle: CoffeeHandle;
+  name: string;
+  percentage: number;
+  targetKg: number;
+  bagSizeGrams: number;
+  bagCount: number;
+  variantId: number | null;
+  priceB2CPerBag: number;
+  priceB2BPerBag: number;
+  totalB2C: number;
+  totalB2B: number;
+};
+
+export type ProfessionalMixResult = {
+  totalKg: number;
+  lines: ProfessionalMixLine[];
+  totalEstimatedB2B: number;
+  totalEstimatedB2C: number;
+  cartUrl: string | null;
+};
+
 export type DecisionEngineResult =
   | {
       type: "professional_volume";
       reply: string;
       meta: ProfessionalVolumeResult;
-    }
-  | {
-      type: "cup_economics";
-      reply: string;
+      mix: ProfessionalMixResult | null;
     }
   | {
       type: "monthly_quantity";
@@ -32,32 +51,51 @@ export type DecisionEngineResult =
     }
   | null;
 
+type ShopifyProductJson = {
+  title?: string;
+  handle?: string;
+  variants?: Array<{
+    id?: number;
+    title?: string;
+    price?: number | string;
+  }>;
+};
+
+type ProductVariantInfo = {
+  id: number | null;
+  title: string;
+  priceB2C: number;
+  priceB2B: number;
+  bagSizeGrams: number;
+};
+
+const SHOPIFY_BASE_URL = "https://arte-coffee.com";
+const B2B_FACTOR = 0.8; // B2B = 20% menos que B2C
+
+const coffeeNames: Record<CoffeeHandle, string> = {
+  catuai: "Catuai",
+  pacamara: "Pacamara",
+  geisha: "Geisha",
+};
+
 export async function runBaristaDecisionEngine(params: {
   message: string;
 }): Promise<DecisionEngineResult> {
   const { message } = params;
   const intent = detectDecisionIntent(message);
 
-  if (intent === "cup_economics") {
-    const reply = await buildCupEconomicsReply({ message });
-    if (!reply) return null;
-
-    return {
-      type: "cup_economics",
-      reply,
-    };
-  }
-
   if (intent === "professional_volume") {
     const parsed = parseProfessionalVolumeQuery(message);
     if (!parsed) return null;
 
     const calculated = calculateProfessionalCoffeeVolume(parsed);
+    const mix = await buildProfessionalMixRecommendation(calculated.totalKg);
 
     return {
       type: "professional_volume",
-      reply: buildProfessionalVolumeReply(calculated),
+      reply: buildProfessionalVolumeReply(calculated, mix),
       meta: calculated,
+      mix,
     };
   }
 
@@ -78,7 +116,6 @@ export function detectDecisionIntent(message: string): BaristaDecisionIntent {
   const text = normalize(message);
 
   if (isProfessionalVolumeIntent(text)) return "professional_volume";
-  if (isCupEconomicsIntent(text)) return "cup_economics";
   if (isMonthlyQuantityIntent(text)) return "monthly_quantity";
 
   return "general";
@@ -92,17 +129,16 @@ export function isProfessionalVolumeIntent(text: string): boolean {
       text.includes("hotel") ||
       text.includes("horeca") ||
       text.includes("sirvo")) &&
-    (
-      text.includes("cafes al dia") ||
-      text.includes("cafés al día") ||
+    (text.includes("cafes") ||
+      text.includes("cafés") ||
+      text.includes("tazas") ||
       text.includes("cada 15 dias") ||
       text.includes("cada 15 días") ||
       text.includes("cuanto cafe tendria que comprar") ||
       text.includes("cuánto café tendría que comprar") ||
       text.includes("cuanto cafe comprar") ||
       text.includes("volumen de cafe") ||
-      text.includes("volumen de café")
-    )
+      text.includes("volumen de café"))
   );
 }
 
@@ -136,8 +172,10 @@ export function parseProfessionalVolumeQuery(message: string): {
   const text = normalize(message);
 
   const coffeesPerDay =
+    extractTotalCoffeesFromText(text) ??
     extractNumberBefore(text, "cafes") ??
     extractNumberBefore(text, "cafés") ??
+    extractNumberBefore(text, "tazas") ??
     extractNumberBefore(text, "cafes diarios") ??
     extractNumberBefore(text, "cafes al dia") ??
     extractNumberBefore(text, "cafés al día");
@@ -155,9 +193,7 @@ export function parseProfessionalVolumeQuery(message: string): {
   }
 
   const gramsPerCup =
-    extractExplicitGramsPerCup(text) ??
-    inferGramsPerCupFromContext(text) ??
-    8;
+    extractExplicitGramsPerCup(text) ?? inferGramsPerCupFromContext(text) ?? 8;
 
   return {
     coffeesPerDay,
@@ -187,17 +223,154 @@ export function calculateProfessionalCoffeeVolume(input: {
   };
 }
 
-export function buildProfessionalVolumeReply(result: ProfessionalVolumeResult): string {
-  const periodLabel = result.days === 15 ? "cada 15 días" : result.days === 7 ? "por semana" : "al mes";
+export async function buildProfessionalMixRecommendation(
+  totalKg: number
+): Promise<ProfessionalMixResult | null> {
+  const mix = buildMixPercentages(totalKg);
 
-  return [
+  const entries = await Promise.all(
+    (Object.entries(mix) as Array<[CoffeeHandle, number]>).map(
+      async ([handle, percentage]) => {
+        if (percentage <= 0) return null;
+
+        const targetKg = totalKg * percentage;
+        const variants = await getShopifyVariantsForHandle(handle);
+        const preferred = pickPreferredProfessionalVariant(variants);
+
+        if (!preferred) return null;
+
+        const bagCount = Math.max(
+          1,
+          Math.ceil((targetKg * 1000) / preferred.bagSizeGrams)
+        );
+
+        const totalB2C = roundMoney(preferred.priceB2C * bagCount);
+        const totalB2B = roundMoney(preferred.priceB2B * bagCount);
+
+        return {
+          handle,
+          name: coffeeNames[handle],
+          percentage,
+          targetKg: roundToOneDecimal(targetKg),
+          bagSizeGrams: preferred.bagSizeGrams,
+          bagCount,
+          variantId: preferred.id,
+          priceB2CPerBag: preferred.priceB2C,
+          priceB2BPerBag: preferred.priceB2B,
+          totalB2C,
+          totalB2B,
+        } satisfies ProfessionalMixLine;
+      }
+    )
+  );
+
+  const lines = entries.filter(Boolean) as ProfessionalMixLine[];
+
+  if (!lines.length) return null;
+
+  const totalEstimatedB2B = roundMoney(
+    lines.reduce((sum, line) => sum + line.totalB2B, 0)
+  );
+  const totalEstimatedB2C = roundMoney(
+    lines.reduce((sum, line) => sum + line.totalB2C, 0)
+  );
+
+  const cartParts = lines
+    .filter((line) => line.variantId && line.bagCount > 0)
+    .map((line) => `${line.variantId}:${line.bagCount}`);
+
+  const cartUrl = cartParts.length
+    ? `${SHOPIFY_BASE_URL}/cart/${cartParts.join(",")}`
+    : null;
+
+  return {
+    totalKg: roundToOneDecimal(totalKg),
+    lines,
+    totalEstimatedB2B,
+    totalEstimatedB2C,
+    cartUrl,
+  };
+}
+
+export function buildProfessionalVolumeReply(
+  result: ProfessionalVolumeResult,
+  mix: ProfessionalMixResult | null
+): string {
+  const periodLabel =
+    result.days === 15
+      ? "cada 15 días"
+      : result.days === 7
+      ? "por semana"
+      : "al mes";
+
+  const lines: string[] = [
     `Necesitarías aproximadamente ${formatKg(result.totalKg)} de café ${periodLabel}.`,
-    ``,
-    `Compra recomendada:`,
-    `- ${result.recommended1kgBags} bolsas de 1 kg en formato profesional`,
-    ``,
-    `Tomas como referencia ${result.gramsPerCup} g por taza y ${result.coffeesPerDay} cafés al día.`,
-  ].join("\n");
+    "",
+  ];
+
+  if (mix?.lines.length) {
+    lines.push("Compra recomendada:");
+
+    mix.lines.forEach((line) => {
+      lines.push(
+        `- ${line.bagCount} bolsas de ${formatBagSize(line.bagSizeGrams)} de ${line.name} (${Math.round(line.percentage * 100)}%)`
+      );
+    });
+
+    lines.push("", "Desglose estimado por variedad:");
+
+    mix.lines.forEach((line) => {
+      lines.push(
+        `- ${line.name}: ${line.bagCount} bolsas · ${formatEuro(line.totalB2B)} B2B · ${formatEuro(line.totalB2C)} B2C`
+      );
+    });
+
+    lines.push(
+      "",
+      `Inversión estimada total B2B: ${formatEuro(mix.totalEstimatedB2B)}`,
+      `Referencia total B2C equivalente: ${formatEuro(mix.totalEstimatedB2C)}`
+    );
+
+    if (mix.cartUrl) {
+      lines.push("", `Carrito directo Shopify: ${mix.cartUrl}`);
+    }
+  } else {
+    lines.push(
+      "Compra recomendada:",
+      `- ${result.recommended1kgBags} bolsas de 1 kg en formato profesional`
+    );
+  }
+
+  lines.push(
+    "",
+    `Tomas como referencia ${result.gramsPerCup} g por taza y ${result.coffeesPerDay} cafés al día.`
+  );
+
+  return lines.join("\n");
+}
+
+function buildMixPercentages(totalKg: number): Record<CoffeeHandle, number> {
+  if (totalKg >= 40) {
+    return {
+      catuai: 0.7,
+      pacamara: 0.2,
+      geisha: 0.1,
+    };
+  }
+
+  if (totalKg >= 20) {
+    return {
+      catuai: 0.75,
+      pacamara: 0.2,
+      geisha: 0.05,
+    };
+  }
+
+  return {
+    catuai: 0.8,
+    pacamara: 0.2,
+    geisha: 0,
+  };
 }
 
 export function buildCommercialQuantityReplyAdvanced(message: string): string | null {
@@ -275,6 +448,88 @@ export function buildCommercialQuantityReplyAdvanced(message: string): string | 
   ].join("\n");
 }
 
+async function getShopifyVariantsForHandle(
+  handle: CoffeeHandle
+): Promise<ProductVariantInfo[]> {
+  const response = await fetch(`${SHOPIFY_BASE_URL}/products/${handle}.js`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) return [];
+
+  const data = (await response.json()) as ShopifyProductJson;
+
+  return (data.variants || [])
+    .map((variant) => {
+      const bagSizeGrams = parseBagSizeGrams(variant.title || "");
+      if (!bagSizeGrams) return null;
+
+      const priceB2C = normalizePrice(variant.price);
+      const priceB2B = roundMoney(priceB2C * B2B_FACTOR);
+
+      return {
+        id: typeof variant.id === "number" ? variant.id : null,
+        title: variant.title || "",
+        priceB2C,
+        priceB2B,
+        bagSizeGrams,
+      } satisfies ProductVariantInfo;
+    })
+    .filter(Boolean) as ProductVariantInfo[];
+}
+
+function pickPreferredProfessionalVariant(
+  variants: ProductVariantInfo[]
+): ProductVariantInfo | null {
+  if (!variants.length) return null;
+
+  const preferredOrder = [1000, 500, 250];
+  for (const grams of preferredOrder) {
+    const match = variants.find((variant) => variant.bagSizeGrams === grams);
+    if (match) return match;
+  }
+
+  return variants[0] ?? null;
+}
+
+function parseBagSizeGrams(title: string): number {
+  const normalized = title.toLowerCase().replace(/\s+/g, " ").trim();
+
+  const kgMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*kg/);
+  if (kgMatch) {
+    const kilos = Number(kgMatch[1].replace(",", "."));
+    return Number.isFinite(kilos) ? Math.round(kilos * 1000) : 0;
+  }
+
+  const gramMatch = normalized.match(/(\d+)\s*g\b/);
+  if (gramMatch) {
+    const grams = Number(gramMatch[1]);
+    return Number.isFinite(grams) ? grams : 0;
+  }
+
+  return 0;
+}
+
+function normalizePrice(price: number | string | undefined): number {
+  if (typeof price === "number") {
+    return price > 999 ? roundMoney(price / 100) : roundMoney(price);
+  }
+
+  if (typeof price === "string") {
+    const numeric = Number(price.replace(",", "."));
+    return Number.isFinite(numeric)
+      ? numeric > 999
+        ? roundMoney(numeric / 100)
+        : roundMoney(numeric)
+      : 0;
+  }
+
+  return 0;
+}
+
 function extractExplicitGramsPerCup(text: string): number | null {
   const match = text.match(/(\d+(?:[.,]\d+)?)\s*g(?:r)?\s*(?:por taza|\/taza|cada taza)/i);
   if (!match) return null;
@@ -288,6 +543,21 @@ function inferGramsPerCupFromContext(text: string): number | null {
   if (text.includes("pacamara")) return 8.5;
   if (text.includes("catuai")) return 8;
   return null;
+}
+
+function extractTotalCoffeesFromText(message: string): number | null {
+  const matches = message.match(/(\d+)\s*(?:caf(?:e|é)s?|tazas?)/gi);
+
+  if (!matches) return null;
+
+  let total = 0;
+
+  for (const m of matches) {
+    const num = Number(m.replace(/[^\d]/g, ""));
+    if (Number.isFinite(num)) total += num;
+  }
+
+  return total > 0 ? total : null;
 }
 
 function extractDailyCoffeeCount(message: string): number | null {
@@ -351,5 +621,25 @@ function normalize(value: string): string {
 }
 
 function formatKg(value: number): string {
-  return `${(Math.round(value * 10) / 10).toFixed(1)} kg`;
+  return `${roundToOneDecimal(value).toFixed(1)} kg`;
+}
+
+function formatBagSize(value: number): string {
+  if (value >= 1000 && value % 1000 === 0) {
+    return `${value / 1000} kg`;
+  }
+
+  return `${value} g`;
+}
+
+function formatEuro(value: number): string {
+  return `${roundMoney(value).toFixed(2)} €`;
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function roundToOneDecimal(value: number): number {
+  return Math.round(value * 10) / 10;
 }
