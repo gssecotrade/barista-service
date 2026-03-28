@@ -315,10 +315,53 @@ export async function buildProfessionalMixRecommendation(
           const effectiveBagSizeGrams =
             preferred?.bagSizeGrams ?? fallbackBagSizeGrams;
   
-          const bagCount = Math.max(
-            1,
-            Math.ceil((targetKg * 1000) / effectiveBagSizeGrams)
-          );
+            const targetGrams = targetKg * 1000;
+
+            // ordenar formatos disponibles (Shopify) de mayor a menor
+            const sortedVariants = (variants || [])
+              .filter(v => v.bagSizeGrams)
+              .sort((a, b) => b.bagSizeGrams - a.bagSizeGrams);
+            
+            let remainingGrams = targetGrams;
+            
+            const formatBreakdown: Array<{
+              variantId: string;
+              bagSizeGrams: number;
+              quantity: number;
+              priceB2C: number;
+              priceB2B: number;
+            }> = [];
+            
+            for (const variant of sortedVariants) {
+              if (remainingGrams <= 0) break;
+            
+              const qty = Math.floor(remainingGrams / variant.bagSizeGrams);
+            
+              if (qty > 0) {
+                formatBreakdown.push({
+                  variantId: variant.id,
+                  bagSizeGrams: variant.bagSizeGrams,
+                  quantity: qty,
+                  priceB2C: variant.priceB2C,
+                  priceB2B: variant.priceB2B,
+                });
+            
+                remainingGrams -= qty * variant.bagSizeGrams;
+              }
+            }
+            
+            // si queda resto → lo cubres con el formato más pequeño
+            if (remainingGrams > 0 && sortedVariants.length > 0) {
+              const smallest = sortedVariants[sortedVariants.length - 1];
+            
+              formatBreakdown.push({
+                variantId: smallest.id,
+                bagSizeGrams: smallest.bagSizeGrams,
+                quantity: 1,
+                priceB2C: smallest.priceB2C,
+                priceB2B: smallest.priceB2B,
+              });
+            }
   
           const priceB2CPerBag = preferred?.priceB2C ?? 0;
           const priceB2BPerBag = preferred?.priceB2B ?? 0;

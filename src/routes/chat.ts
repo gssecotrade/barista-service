@@ -13,6 +13,7 @@ import {
   isCupEconomicsIntent,
 } from "../services/barista-pricing.service";
 import { runBaristaDecisionEngine } from "../services/barista-decision-engine.service";
+import { buildProfessionalEconomicsReply } from "../services/barista-pricing.service";
 
 const chatBodySchema = z.object({
   userId: z.string().min(1),
@@ -125,24 +126,31 @@ export async function chatRoutes(app: FastifyInstance) {
     const engineResult = await runBaristaDecisionEngine({ message });
     const suppressProductCardsForProfessionalVolume =
       engineResult?.type === "professional_volume";
-    
+
+    const professionalContext =
+      engineResult?.type === "professional_volume"
+        ? engineResult
+        : null;
+
     const forcedCommercialReply =
       engineResult?.type === "professional_volume"
         ? null
         : buildCommercialQuantityReply(message);
-    
+
     const forcedEconomicsReply =
-      engineResult?.type === "professional_volume"
+      isCupEconomicsIntent(message) && professionalContext
+        ? buildProfessionalEconomicsReply(professionalContext)
+        : engineResult?.type === "professional_volume"
         ? null
         : await buildCupEconomicsReply({ message });
-    
+
     const safeReply = isCupEconomicsIntent(message)
       ? rawBaristaReply
       : sanitizeForbiddenContent(rawBaristaReply);
-    
+
     const baristaReply =
-      engineResult?.reply ||
       forcedEconomicsReply ||
+      engineResult?.reply ||
       forcedCommercialReply ||
       safeReply;
 
