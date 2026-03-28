@@ -502,13 +502,26 @@ export function buildProfessionalVolumeReply(
   if (mix?.lines.length) {
     lines.push("Propuesta de variedades:");
 
-    mix.lines.forEach((line) => {
-      lines.push(
-        `- ${line.name}: ${line.bagCount} bolsas de ${formatBagSize(line.bagSizeGrams)} (${Math.round(line.percentage * 100)}%)`
-      );
-    });
+    for (const line of mix.lines) {
+      const breakdown = line.formatBreakdown ?? [];
 
-    lines.push("", `Enfoque recomendado: ${getBusinessModeLabel(result.businessMode)}.`);
+      if (breakdown.length > 0) {
+        const formattedBreakdown = breakdown
+          .map(
+            (item) =>
+              `${item.quantity} bolsa${item.quantity > 1 ? "s" : ""} de ${formatBagSize(item.bagSizeGrams)}`
+          )
+          .join(" + ");
+
+        lines.push(
+          `- ${line.name}: ${roundToOneDecimal(line.targetKg)} kg aprox. → ${formattedBreakdown} (${Math.round(line.percentage * 100)}%)`
+        );
+      } else {
+        lines.push(
+          `- ${line.name}: ${roundToOneDecimal(line.targetKg)} kg aprox. (${Math.round(line.percentage * 100)}%)`
+        );
+      }
+    }
   } else {
     lines.push(
       "Formato recomendado:",
@@ -855,16 +868,18 @@ function pickPreferredProfessionalVariant(
 function parseBagSizeGrams(title: string): number {
   const normalized = title.toLowerCase().replace(/\s+/g, " ").trim();
 
-  const kgMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*kg/);
+  // 1 kg / 0.5 kg / 0,25 kg
+  const kgMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*kg\b/);
   if (kgMatch) {
     const kilos = Number(kgMatch[1].replace(",", "."));
     return Number.isFinite(kilos) ? Math.round(kilos * 1000) : 0;
   }
 
-  const gramMatch = normalized.match(/(\d+)\s*g\b/);
+  // 250 g / 250gr / 250 gr / 250 gr.
+  const gramMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*g(?:r)?\.?\b/);
   if (gramMatch) {
-    const grams = Number(gramMatch[1]);
-    return Number.isFinite(grams) ? grams : 0;
+    const grams = Number(gramMatch[1].replace(",", "."));
+    return Number.isFinite(grams) ? Math.round(grams) : 0;
   }
 
   return 0;
