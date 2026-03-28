@@ -298,73 +298,77 @@ export function calculateProfessionalCoffeeVolume(input: {
 }
 
 export async function buildProfessionalMixRecommendation(
-  result: ProfessionalVolumeResult
-): Promise<ProfessionalMixResult | null> {
-  const mix = buildMomentBasedMix(result);
-
-  const entries = await Promise.all(
-    (Object.entries(mix) as Array<[CoffeeHandle, number]>).map(
-      async ([handle, percentage]) => {
-        if (percentage < 0.01) return null;
-
-        const targetKg = result.totalKg * percentage;
-        const variants = await getShopifyVariantsForHandle(handle);
-        const preferred = pickPreferredProfessionalVariant(variants);
-
-        if (!preferred) return null;
-
-        const bagCount = Math.max(
-          1,
-          Math.ceil((targetKg * 1000) / preferred.bagSizeGrams)
-        );
-
-        const totalB2C = roundMoney(preferred.priceB2C * bagCount);
-        const totalB2B = roundMoney(preferred.priceB2B * bagCount);
-
-        return {
-          handle,
-          name: coffeeNames[handle],
-          percentage,
-          targetKg: roundToOneDecimal(targetKg),
-          bagSizeGrams: preferred.bagSizeGrams,
-          bagCount,
-          variantId: preferred.id,
-          priceB2CPerBag: preferred.priceB2C,
-          priceB2BPerBag: preferred.priceB2B,
-          totalB2C,
-          totalB2B,
-        } satisfies ProfessionalMixLine;
-      }
-    )
-  );
-
-  const lines = entries.filter(Boolean) as ProfessionalMixLine[];
-
-  if (!lines.length) return null;
-
-  const totalEstimatedB2B = roundMoney(
-    lines.reduce((sum, line) => sum + line.totalB2B, 0)
-  );
-  const totalEstimatedB2C = roundMoney(
-    lines.reduce((sum, line) => sum + line.totalB2C, 0)
-  );
-
-  const cartParts = lines
-    .filter((line) => line.variantId && line.bagCount > 0)
-    .map((line) => `${line.variantId}:${line.bagCount}`);
-
-  const cartUrl = cartParts.length
-    ? `${SHOPIFY_BASE_URL}/cart/${cartParts.join(",")}`
-    : null;
-
-  return {
-    totalKg: roundToOneDecimal(result.totalKg),
-    lines,
-    totalEstimatedB2B,
-    totalEstimatedB2C,
-    cartUrl,
-  };
-}
+    result: ProfessionalVolumeResult
+  ): Promise<ProfessionalMixResult | null> {
+    const mix = buildMomentBasedMix(result);
+  
+    const entries = await Promise.all(
+      (Object.entries(mix) as Array<[CoffeeHandle, number]>).map(
+        async ([handle, percentage]) => {
+          if (percentage < 0.01) return null;
+  
+          const targetKg = result.totalKg * percentage;
+          const variants = await getShopifyVariantsForHandle(handle);
+          const preferred = pickPreferredProfessionalVariant(variants);
+  
+          const fallbackBagSizeGrams = 1000;
+          const effectiveBagSizeGrams =
+            preferred?.bagSizeGrams ?? fallbackBagSizeGrams;
+  
+          const bagCount = Math.max(
+            1,
+            Math.ceil((targetKg * 1000) / effectiveBagSizeGrams)
+          );
+  
+          const priceB2CPerBag = preferred?.priceB2C ?? 0;
+          const priceB2BPerBag = preferred?.priceB2B ?? 0;
+          const totalB2C = roundMoney(priceB2CPerBag * bagCount);
+          const totalB2B = roundMoney(priceB2BPerBag * bagCount);
+  
+          return {
+            handle,
+            name: coffeeNames[handle],
+            percentage,
+            targetKg: roundToOneDecimal(targetKg),
+            bagSizeGrams: effectiveBagSizeGrams,
+            bagCount,
+            variantId: preferred?.id ?? null,
+            priceB2CPerBag,
+            priceB2BPerBag,
+            totalB2C,
+            totalB2B,
+          } satisfies ProfessionalMixLine;
+        }
+      )
+    );
+  
+    const lines = entries.filter(Boolean) as ProfessionalMixLine[];
+  
+    if (!lines.length) return null;
+  
+    const totalEstimatedB2B = roundMoney(
+      lines.reduce((sum, line) => sum + line.totalB2B, 0)
+    );
+    const totalEstimatedB2C = roundMoney(
+      lines.reduce((sum, line) => sum + line.totalB2C, 0)
+    );
+  
+    const cartParts = lines
+      .filter((line) => line.variantId && line.bagCount > 0)
+      .map((line) => `${line.variantId}:${line.bagCount}`);
+  
+    const cartUrl = cartParts.length
+      ? `${SHOPIFY_BASE_URL}/cart/${cartParts.join(",")}`
+      : null;
+  
+    return {
+      totalKg: roundToOneDecimal(result.totalKg),
+      lines,
+      totalEstimatedB2B,
+      totalEstimatedB2C,
+      cartUrl,
+    };
+  }
 
 export function buildProfessionalVolumeReply(
   result: ProfessionalVolumeResult,

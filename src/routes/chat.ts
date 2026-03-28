@@ -125,14 +125,21 @@ export async function chatRoutes(app: FastifyInstance) {
     const engineResult = await runBaristaDecisionEngine({ message });
     const suppressProductCardsForProfessionalVolume =
       engineResult?.type === "professional_volume";
-
-    const forcedCommercialReply = buildCommercialQuantityReply(message);
-    const forcedEconomicsReply = await buildCupEconomicsReply({ message });
-
+    
+    const forcedCommercialReply =
+      engineResult?.type === "professional_volume"
+        ? null
+        : buildCommercialQuantityReply(message);
+    
+    const forcedEconomicsReply =
+      engineResult?.type === "professional_volume"
+        ? null
+        : await buildCupEconomicsReply({ message });
+    
     const safeReply = isCupEconomicsIntent(message)
       ? rawBaristaReply
       : sanitizeForbiddenContent(rawBaristaReply);
-
+    
     const baristaReply =
       engineResult?.reply ||
       forcedEconomicsReply ||
