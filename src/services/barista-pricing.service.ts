@@ -228,7 +228,13 @@ async function getProductPricing(handle: CoffeeHandle): Promise<ProductPricingIn
   });
 
   if (!response.ok) {
-    throw new Error(`No se pudo leer el producto ${handle} desde Shopify`);
+    console.error(`Shopify pricing fetch failed for ${handle}: ${response.status}`);
+    return {
+      handle,
+      name: coffeeBusinessRules[handle].name,
+      variants: [],
+      recommendedGramsPerCup: coffeeBusinessRules[handle].recommendedGramsPerCup,
+    };
   }
 
   const data = (await response.json()) as ShopifyProductJson;

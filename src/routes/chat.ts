@@ -49,250 +49,256 @@ type ProductPayload = {
 
 export async function chatRoutes(app: FastifyInstance) {
   app.post("/chat", async (request, reply) => {
-    const parsed = chatBodySchema.safeParse(request.body);
-
-    if (!parsed.success) {
-      return reply.status(400).send({
-        error: "invalid_body",
-        details: parsed.error.flatten(),
-      });
-    }
-
-    const { userId, message, context } = parsed.data;
-
-    const user = await prisma.baristaUser.findUnique({
-      where: { id: userId },
-      include: {
-        profile: true,
-        messages: {
-          orderBy: { createdAt: "desc" },
-          take: 12,
-        },
-      },
-    });
-
-    if (!user) {
-      return reply.status(404).send({
-        error: "user_not_found",
-      });
-    }
-
-    const dbState = normalizeBaristaState(
-      (user.profile?.state as Record<string, unknown> | null) ?? EMPTY_BARISTA_STATE
-    );
-
-    const mergedInputState = normalizeBaristaState({
-      ...dbState,
-      activeCoffee:
-        dbState.activeCoffee ??
-        mapCoffeeFromContext(context?.lastCoffee ?? null),
-      activeTopic:
-        dbState.activeTopic ??
-        mapIntentToTopic(context?.lastIntent ?? null),
-    });
-
-    const history = user.messages
-      .slice()
-      .reverse()
-      .map((msg) => ({
-        role: msg.role === "assistant" ? "assistant" : "user",
-        content: msg.content,
-      }));
-
-    await prisma.baristaMessage.create({
-      data: {
-        userId,
-        role: "user",
-        content: message,
-        meta: {
-          source: "shopify_widget",
-        },
-      },
-    });
-
-    const { reply: rawBaristaReply, updatedContext } = await generateBaristaResponse({
-      userMessage: message,
-      history,
-      context: {
-        lastCoffee: mergedInputState.activeCoffee ?? undefined,
-        lastIntent: mergedInputState.activeTopic ?? undefined,
-        lastStyle: mergedInputState.activeDrinkType ?? undefined,
-        summary:
-          mergedInputState.lastAssistantSummary ??
-          buildFriendlySummary(mergedInputState),
-      },
-    });
-    
-    const engineResult = await runBaristaDecisionEngine({ message });
-    console.log("ENGINE RESULT:", JSON.stringify(engineResult, null, 2));
-
-    const suppressProductCardsForProfessionalVolume =
-      engineResult?.type === "professional_volume";
-
-    const professionalContext =
-      engineResult?.type === "professional_volume"
-        ? engineResult
-        : null;
-
-    const forcedCommercialReply =
-      engineResult?.type === "professional_volume"
-        ? null
-        : buildCommercialQuantityReply(message);
-
-    const forcedEconomicsReply =
-      isCupEconomicsIntent(message) && professionalContext
-        ? buildProfessionalEconomicsReply(professionalContext)
-        : engineResult?.type === "professional_volume"
-        ? null
-        : await buildCupEconomicsReply({ message });
-
-    const safeReply = isCupEconomicsIntent(message)
-      ? rawBaristaReply
-      : sanitizeForbiddenContent(rawBaristaReply);
-
-    const baristaReply =
-      forcedEconomicsReply ||
-      engineResult?.reply ||
-      forcedCommercialReply ||
-      safeReply;
-
-    console.log("FINAL BARISTA REPLY:", baristaReply);
-
-    const inferredCoffee =
-      inferCoffeeFromText(`${message} ${baristaReply}`) ??
-      normalizeCoffeeValue(updatedContext?.lastCoffee ?? null) ??
-      mergedInputState.activeCoffee ??
-      null;
-
-    const inferredTopic =
-      inferTopicFromText(`${message} ${baristaReply}`) ??
-      mergedInputState.activeTopic ??
-      "general";
-
-    const inferredDrinkType =
-      inferDrinkTypeFromText(`${message} ${baristaReply}`) ??
-      mergedInputState.activeDrinkType ??
-      null;
-
-    const inferredRecipe =
-      inferRecipeFromText(`${message} ${baristaReply}`) ??
-      mergedInputState.activeRecipe ??
-      null;
-
-    const shouldShowProduct =
-      shouldReturnProduct({
-        message,
-        reply: baristaReply,
-        topic: inferredTopic,
-        coffee: inferredCoffee,
-      }) &&
-      !isCommercialClosingStep({
-        message,
-        reply: baristaReply,
-      }) &&
-      !isNonCommercialQuantityReply({
-        message,
-        reply: baristaReply,
-      }) && 
-      !suppressProductCardsForProfessionalVolume; 
-
-
-    const resolvedProducts = shouldShowProduct
-      ? resolveProductsFromReply({
-          reply: baristaReply,
-          fallbackCoffee: inferredCoffee,
-          topic: inferredTopic,
-          recipe: inferredRecipe,
-          userMessage: message,
-        })
-      : [];
-
-    const nextState = mergeBaristaState(mergedInputState, {
-      activeCoffee: inferredCoffee,
-      activeTopic: inferredTopic,
-      activeDrinkType: inferredDrinkType,
-      activeRecipe: inferredRecipe,
-      lastUserGoal: message,
-      lastAssistantSummary:
-        buildAssistantSummary({
-          coffee: inferredCoffee,
-          topic: inferredTopic,
-          recipe: inferredRecipe,
-          drinkType: inferredDrinkType,
-          reply: baristaReply,
-        }) ??
-        updatedContext?.summary ??
-        mergedInputState.lastAssistantSummary,
-      conversationMode: "continue",
-    });
-
-    await prisma.baristaMessage.create({
-      data: {
-        userId,
-        role: "assistant",
-        content: baristaReply,
-        meta: {
-          topic: nextState.activeTopic,
-          coffee: nextState.activeCoffee,
-          recipe: nextState.activeRecipe,
-          drinkType: nextState.activeDrinkType,
-          product: resolvedProducts[0] ?? null,
-          products: resolvedProducts,
-        },
-      },
-    });
-
-    if (user.profile) {
-      await prisma.baristaProfile.update({
-        where: { id: user.profile.id },
-        data: {
-          lastIntent: nextState.activeTopic ?? "general",
-          favoriteCoffee:
-            nextState.activeCoffee ?? user.profile.favoriteCoffee ?? null,
-          preferences: {
-            ...(isObject(user.profile.preferences)
-              ? user.profile.preferences
-              : {}),
-            activeMethod: nextState.activeMethod,
-            tasteProfile: nextState.tasteProfile,
-            activeRecipe: nextState.activeRecipe,
-            activeDrinkType: nextState.activeDrinkType,
-            lastUserGoal: nextState.lastUserGoal,
-            lastAssistantSummary: nextState.lastAssistantSummary,
-            conversationMode: nextState.conversationMode,
+    try {
+      const parsed = chatBodySchema.safeParse(request.body);
+  
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: "invalid_body",
+          details: parsed.error.flatten(),
+        });
+      }
+  
+      const { userId, message, context } = parsed.data;
+  
+      const user = await prisma.baristaUser.findUnique({
+        where: { id: userId },
+        include: {
+          profile: true,
+          messages: {
+            orderBy: { createdAt: "desc" },
+            take: 12,
           },
-          state: nextState,
         },
       });
-    } else {
-      await prisma.baristaProfile.create({
+  
+      if (!user) {
+        return reply.status(404).send({
+          error: "user_not_found",
+        });
+      }
+  
+      const dbState = normalizeBaristaState(
+        (user.profile?.state as Record<string, unknown> | null) ?? EMPTY_BARISTA_STATE
+      );
+  
+      const mergedInputState = normalizeBaristaState({
+        ...dbState,
+        activeCoffee:
+          dbState.activeCoffee ??
+          mapCoffeeFromContext(context?.lastCoffee ?? null),
+        activeTopic:
+          dbState.activeTopic ??
+          mapIntentToTopic(context?.lastIntent ?? null),
+      });
+  
+      const history = user.messages
+        .slice()
+        .reverse()
+        .map((msg) => ({
+          role: msg.role === "assistant" ? "assistant" : "user",
+          content: msg.content,
+        }));
+  
+      await prisma.baristaMessage.create({
         data: {
           userId,
-          lastIntent: nextState.activeTopic ?? "general",
-          favoriteCoffee: nextState.activeCoffee,
-          preferences: {
-            activeMethod: nextState.activeMethod,
-            tasteProfile: nextState.tasteProfile,
-            activeRecipe: nextState.activeRecipe,
-            activeDrinkType: nextState.activeDrinkType,
-            lastUserGoal: nextState.lastUserGoal,
-            lastAssistantSummary: nextState.lastAssistantSummary,
-            conversationMode: nextState.conversationMode,
+          role: "user",
+          content: message,
+          meta: {
+            source: "shopify_widget",
           },
-          state: nextState,
         },
       });
+  
+      const { reply: rawBaristaReply, updatedContext } = await generateBaristaResponse({
+        userMessage: message,
+        history,
+        context: {
+          lastCoffee: mergedInputState.activeCoffee ?? undefined,
+          lastIntent: mergedInputState.activeTopic ?? undefined,
+          lastStyle: mergedInputState.activeDrinkType ?? undefined,
+          summary:
+            mergedInputState.lastAssistantSummary ??
+            buildFriendlySummary(mergedInputState),
+        },
+      });
+  
+      const engineResult = await runBaristaDecisionEngine({ message });
+      console.log("ENGINE RESULT:", JSON.stringify(engineResult, null, 2));
+  
+      const suppressProductCardsForProfessionalVolume =
+        engineResult?.type === "professional_volume";
+  
+      const professionalContext =
+        engineResult?.type === "professional_volume"
+          ? engineResult
+          : null;
+  
+      const forcedCommercialReply =
+        engineResult?.type === "professional_volume"
+          ? null
+          : buildCommercialQuantityReply(message);
+  
+      const forcedEconomicsReply =
+        isCupEconomicsIntent(message) && professionalContext
+          ? buildProfessionalEconomicsReply(professionalContext)
+          : engineResult?.type === "professional_volume"
+          ? null
+          : await buildCupEconomicsReply({ message });
+  
+      const safeReply = isCupEconomicsIntent(message)
+        ? rawBaristaReply
+        : sanitizeForbiddenContent(rawBaristaReply);
+  
+      const baristaReply =
+        forcedEconomicsReply ||
+        engineResult?.reply ||
+        forcedCommercialReply ||
+        safeReply;
+  
+      const inferredCoffee =
+        inferCoffeeFromText(`${message} ${baristaReply}`) ??
+        normalizeCoffeeValue(updatedContext?.lastCoffee ?? null) ??
+        mergedInputState.activeCoffee ??
+        null;
+  
+      const inferredTopic =
+        inferTopicFromText(`${message} ${baristaReply}`) ??
+        mergedInputState.activeTopic ??
+        "general";
+  
+      const inferredDrinkType =
+        inferDrinkTypeFromText(`${message} ${baristaReply}`) ??
+        mergedInputState.activeDrinkType ??
+        null;
+  
+      const inferredRecipe =
+        inferRecipeFromText(`${message} ${baristaReply}`) ??
+        mergedInputState.activeRecipe ??
+        null;
+  
+      const shouldShowProduct =
+        shouldReturnProduct({
+          message,
+          reply: baristaReply,
+          topic: inferredTopic,
+          coffee: inferredCoffee,
+        }) &&
+        !isCommercialClosingStep({
+          message,
+          reply: baristaReply,
+        }) &&
+        !isNonCommercialQuantityReply({
+          message,
+          reply: baristaReply,
+        }) &&
+        !suppressProductCardsForProfessionalVolume;
+  
+      const resolvedProducts = shouldShowProduct
+        ? resolveProductsFromReply({
+            reply: baristaReply,
+            fallbackCoffee: inferredCoffee,
+            topic: inferredTopic,
+            recipe: inferredRecipe,
+            userMessage: message,
+          })
+        : [];
+  
+      const nextState = mergeBaristaState(mergedInputState, {
+        activeCoffee: inferredCoffee,
+        activeTopic: inferredTopic,
+        activeDrinkType: inferredDrinkType,
+        activeRecipe: inferredRecipe,
+        lastUserGoal: message,
+        lastAssistantSummary:
+          buildAssistantSummary({
+            coffee: inferredCoffee,
+            topic: inferredTopic,
+            recipe: inferredRecipe,
+            drinkType: inferredDrinkType,
+            reply: baristaReply,
+          }) ??
+          updatedContext?.summary ??
+          mergedInputState.lastAssistantSummary,
+        conversationMode: "continue",
+      });
+  
+      await prisma.baristaMessage.create({
+        data: {
+          userId,
+          role: "assistant",
+          content: baristaReply,
+          meta: {
+            topic: nextState.activeTopic,
+            coffee: nextState.activeCoffee,
+            recipe: nextState.activeRecipe,
+            drinkType: nextState.activeDrinkType,
+            product: resolvedProducts[0] ?? null,
+            products: resolvedProducts,
+          },
+        },
+      });
+  
+      if (user.profile) {
+        await prisma.baristaProfile.update({
+          where: { id: user.profile.id },
+          data: {
+            lastIntent: nextState.activeTopic ?? "general",
+            favoriteCoffee:
+              nextState.activeCoffee ?? user.profile.favoriteCoffee ?? null,
+            preferences: {
+              ...(isObject(user.profile.preferences)
+                ? user.profile.preferences
+                : {}),
+              activeMethod: nextState.activeMethod,
+              tasteProfile: nextState.tasteProfile,
+              activeRecipe: nextState.activeRecipe,
+              activeDrinkType: nextState.activeDrinkType,
+              lastUserGoal: nextState.lastUserGoal,
+              lastAssistantSummary: nextState.lastAssistantSummary,
+              conversationMode: nextState.conversationMode,
+            },
+            state: nextState,
+          },
+        });
+      } else {
+        await prisma.baristaProfile.create({
+          data: {
+            userId,
+            lastIntent: nextState.activeTopic ?? "general",
+            favoriteCoffee: nextState.activeCoffee,
+            preferences: {
+              activeMethod: nextState.activeMethod,
+              tasteProfile: nextState.tasteProfile,
+              activeRecipe: nextState.activeRecipe,
+              activeDrinkType: nextState.activeDrinkType,
+              lastUserGoal: nextState.lastUserGoal,
+              lastAssistantSummary: nextState.lastAssistantSummary,
+              conversationMode: nextState.conversationMode,
+            },
+            state: nextState,
+          },
+        });
+      }
+  
+      return reply.send({
+        ok: true,
+        reply: baristaReply,
+        intent: nextState.activeTopic ?? "general",
+        product: resolvedProducts[0] ?? null,
+        products: resolvedProducts,
+        primaryProduct: resolvedProducts[0] ?? null,
+        state: nextState,
+      });
+    } catch (error) {
+      console.error("CHAT /chat ERROR:", error);
+      return reply.status(500).send({
+        ok: false,
+        error: "chat_internal_error",
+        message: error instanceof Error ? error.message : "unknown_error",
+      });
     }
-
-    return reply.send({
-      ok: true,
-      reply: baristaReply,
-      intent: nextState.activeTopic ?? "general",
-      product: resolvedProducts[0] ?? null,
-      products: resolvedProducts,
-      primaryProduct: resolvedProducts[0] ?? null,
-      state: nextState,
-    });
   });
 }
 

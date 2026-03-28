@@ -97,13 +97,19 @@ export async function runBaristaDecisionEngine(params: {
 }): Promise<DecisionEngineResult> {
   const { message } = params;
   const intent = detectDecisionIntent(message);
+  console.log("DECISION INTENT:", intent, "MESSAGE:", message);
 
   if (intent === "professional_volume") {
     const parsed = parseProfessionalVolumeQuery(message);
+    console.log("PROFESSIONAL PARSED:", parsed);
+
     if (!parsed) return null;
 
     const calculated = calculateProfessionalCoffeeVolume(parsed);
+    console.log("PROFESSIONAL CALCULATED:", calculated);
+
     const mix = await buildProfessionalMixRecommendation(calculated);
+    console.log("PROFESSIONAL MIX:", JSON.stringify(mix, null, 2));
 
     return {
       type: "professional_volume",
@@ -114,12 +120,14 @@ export async function runBaristaDecisionEngine(params: {
   }
 
   if (intent === "monthly_quantity") {
-    const reply = buildCommercialQuantityReplyAdvanced(message);
-    if (!reply) return null;
+    const quantityReply = buildCommercialQuantityReplyAdvanced(message);
+    console.log("MONTHLY QUANTITY REPLY:", quantityReply);
+
+    if (!quantityReply) return null;
 
     return {
       type: "monthly_quantity",
-      reply,
+      reply: quantityReply,
     };
   }
 
