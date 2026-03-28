@@ -141,10 +141,10 @@ export async function chatRoutes(app: FastifyInstance) {
           : buildCommercialQuantityReply(message);
   
       const forcedEconomicsReply =
-        isCupEconomicsIntent(message) && professionalContext
-          ? buildProfessionalEconomicsReply(professionalContext)
-          : engineResult?.type === "professional_volume"
+        engineResult?.type === "professional_volume"
           ? null
+          : isCupEconomicsIntent(message) && professionalContext
+          ? buildProfessionalEconomicsReply(professionalContext)
           : await buildCupEconomicsReply({ message });
   
       const safeReply = isCupEconomicsIntent(message)
@@ -152,8 +152,8 @@ export async function chatRoutes(app: FastifyInstance) {
         : sanitizeForbiddenContent(rawBaristaReply);
   
       const baristaReply =
-        forcedEconomicsReply ||
         engineResult?.reply ||
+        forcedEconomicsReply ||
         forcedCommercialReply ||
         safeReply;
   
