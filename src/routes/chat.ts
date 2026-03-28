@@ -10,10 +10,12 @@ import {
 } from "../services/barista-state.service";
 import {
   buildCupEconomicsReply,
+  buildProfessionalPricingStrategyReply,
+  extractAverageCupPrice,
   isCupEconomicsIntent,
 } from "../services/barista-pricing.service";
+
 import { runBaristaDecisionEngine } from "../services/barista-decision-engine.service";
-import { buildProfessionalEconomicsReply } from "../services/barista-pricing.service";
 
 const chatBodySchema = z.object({
   userId: z.string().min(1),
@@ -126,34 +128,39 @@ export async function chatRoutes(app: FastifyInstance) {
   
       const engineResult = await runBaristaDecisionEngine({ message });
       console.log("ENGINE RESULT:", JSON.stringify(engineResult, null, 2));
-  
+
       const suppressProductCardsForProfessionalVolume =
         engineResult?.type === "professional_volume";
-  
+
       const professionalContext =
         engineResult?.type === "professional_volume"
           ? engineResult
           : null;
-  
+
+      const averageCupPrice = extractAverageCupPrice(message);
+
       const forcedCommercialReply =
         engineResult?.type === "professional_volume"
           ? null
           : buildCommercialQuantityReply(message);
-  
+
       const forcedEconomicsReply =
-        engineResult?.type === "professional_volume"
-          ? null
-          : isCupEconomicsIntent(message) && professionalContext
-          ? buildProfessionalEconomicsReply(professionalContext)
-          : await buildCupEconomicsReply({ message });
-  
+        isCupEconomicsIntent(message) && professionalContext
+          ? buildProfessionalPricingStrategyReply({
+              currentPricePerCup: averageCupPrice ?? 2.5,
+              coffees: professionalContext.mix?.lines ?? [],
+            })
+          : isCupEconomicsIntent(message)
+          ? await buildCupEconomicsReply({ message })
+          : null;
+
       const safeReply = isCupEconomicsIntent(message)
         ? rawBaristaReply
         : sanitizeForbiddenContent(rawBaristaReply);
-  
+
       const baristaReply =
-        engineResult?.reply ||
         forcedEconomicsReply ||
+        engineResult?.reply ||
         forcedCommercialReply ||
         safeReply;
   

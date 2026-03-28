@@ -449,6 +449,82 @@ export function buildProfessionalEconomicsReply(
   return lines.join("\n").trim();
 }
 
+export function buildProfessionalPricingStrategyReply(params: {
+    currentPricePerCup: number;
+    coffees: ProfessionalMixLineLike[];
+  }): string {
+    const { currentPricePerCup, coffees } = params;
+  
+    const lines: string[] = [];
+  
+    lines.push(
+      `Partiendo de tu precio medio actual de ${formatEuro(currentPricePerCup)} por taza, el objetivo no es subir precio sin más, sino aumentar margen mejorando la percepción del producto.`,
+      ""
+    );
+  
+    lines.push("Análisis y propuesta por variedad:");
+  
+    for (const coffee of coffees) {
+      const gramsPerCup = inferGramsPerCup(coffee.handle);
+  
+      const totalGrams =
+        typeof coffee.roundedTargetGrams === "number"
+          ? coffee.roundedTargetGrams
+          : Math.round(coffee.targetKg * 1000);
+  
+      const costPerGram =
+        coffee.totalB2B && totalGrams > 0
+          ? coffee.totalB2B / totalGrams
+          : 0;
+  
+      const costPerCup = roundMoney(costPerGram * gramsPerCup);
+  
+      // 🔥 lógica inteligente
+      let suggestedPrice = currentPricePerCup;
+  
+      if (coffee.handle === "catuai") {
+        suggestedPrice = roundToTenCents(currentPricePerCup + 0.2);
+      }
+  
+      if (coffee.handle === "pacamara") {
+        suggestedPrice = roundToTenCents(currentPricePerCup + 0.4);
+      }
+  
+      if (coffee.handle === "geisha") {
+        suggestedPrice = roundToTenCents(currentPricePerCup + 0.8);
+      }
+  
+      const marginPerCup = roundMoney(suggestedPrice - costPerCup);
+      const currentMargin = roundMoney(currentPricePerCup - costPerCup);
+      const marginIncrease = roundMoney(marginPerCup - currentMargin);
+  
+      lines.push(`${coffee.name}:`);
+      lines.push(`- coste real por taza: ${formatEuro(costPerCup)}`);
+      lines.push(`- precio actual: ${formatEuro(currentPricePerCup)}`);
+      lines.push(`- precio recomendado: ${formatEuro(suggestedPrice)}`);
+      lines.push(`- margen actual: ${formatEuro(currentMargin)}`);
+      lines.push(`- margen potencial: ${formatEuro(marginPerCup)}`);
+      lines.push(`- incremento de margen: +${formatEuro(marginIncrease)}`);
+      lines.push(`- rol en carta: ${describeRole(coffee.handle)}`);
+      lines.push("");
+    }
+  
+    lines.push(
+      "Conclusión:",
+      "El cambio a café de especialidad no reduce margen, lo amplía.",
+      "",
+      "La clave no es el coste del café, sino el reposicionamiento del precio:",
+      "- subes ticket medio",
+      "- aumentas margen por taza",
+      "- mejoras percepción de calidad",
+      "- fidelizas cliente sin perder rotación",
+      "",
+      "Estás vendiendo mejor café… y cobrando mejor por ello."
+    );
+  
+    return lines.join("\n");
+  }
+
 function inferGramsPerCup(handle: CoffeeHandle): number {
   return coffeeBusinessRules[handle].recommendedGramsPerCup;
 }
