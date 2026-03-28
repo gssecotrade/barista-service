@@ -293,61 +293,38 @@ export async function buildProfessionalMixRecommendation(
 }
 
 export function buildProfessionalVolumeReply(
-  result: ProfessionalVolumeResult,
-  mix: ProfessionalMixResult | null
-): string {
-  const periodLabel =
-    result.days === 15
-      ? "cada 15 días"
-      : result.days === 7
-      ? "por semana"
-      : "al mes";
-
-  const lines: string[] = [
-    `Necesitarías aproximadamente ${formatKg(result.totalKg)} de café ${periodLabel}.`,
-    "",
-  ];
-
-  if (mix?.lines.length) {
-    lines.push("Compra recomendada:");
-
-    mix.lines.forEach((line) => {
-      lines.push(
-        `- ${line.bagCount} bolsas de ${formatBagSize(line.bagSizeGrams)} de ${line.name} (${Math.round(line.percentage * 100)}%)`
-      );
-    });
-
-    lines.push("", "Desglose estimado por variedad:");
-
-    mix.lines.forEach((line) => {
-      lines.push(
-        `- ${line.name}: ${line.bagCount} bolsas · ${formatEuro(line.totalB2B)} B2B · ${formatEuro(line.totalB2C)} B2C`
-      );
-    });
-
-    lines.push(
+    result: ProfessionalVolumeResult,
+    mix: ProfessionalMixResult | null
+  ): string {
+    const periodLabel =
+      result.days === 15
+        ? "cada 15 días"
+        : result.days === 7
+        ? "por semana"
+        : "al mes";
+  
+    const lines: string[] = [
+      `Necesitarías aproximadamente ${formatKg(result.totalKg)} de café ${periodLabel}.`,
       "",
-      `Inversión estimada total B2B: ${formatEuro(mix.totalEstimatedB2B)}`,
-      `Referencia total B2C equivalente: ${formatEuro(mix.totalEstimatedB2C)}`
-    );
-
-    if (mix.cartUrl) {
-      lines.push("", `Carrito directo Shopify: ${mix.cartUrl}`);
+    ];
+  
+    if (mix?.lines.length) {
+      lines.push("Propuesta de variedades:");
+  
+      mix.lines.forEach((line) => {
+        lines.push(
+          `- ${line.name}: ${line.bagCount} bolsas de ${formatBagSize(line.bagSizeGrams)} (${Math.round(line.percentage * 100)}%)`
+        );
+      });
+    } else {
+      lines.push(
+        "Formato recomendado:",
+        `- ${result.recommended1kgBags} bolsas de 1 kg`
+      );
     }
-  } else {
-    lines.push(
-      "Compra recomendada:",
-      `- ${result.recommended1kgBags} bolsas de 1 kg en formato profesional`
-    );
+  
+    return lines.join("\n");
   }
-
-  lines.push(
-    "",
-    `Tomas como referencia ${result.gramsPerCup} g por taza y ${result.coffeesPerDay} cafés al día.`
-  );
-
-  return lines.join("\n");
-}
 
 function buildMixPercentages(totalKg: number): Record<CoffeeHandle, number> {
   if (totalKg >= 40) {
