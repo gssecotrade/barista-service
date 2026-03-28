@@ -124,6 +124,8 @@ export async function chatRoutes(app: FastifyInstance) {
     });
     
     const engineResult = await runBaristaDecisionEngine({ message });
+    console.log("ENGINE RESULT:", JSON.stringify(engineResult, null, 2));
+
     const suppressProductCardsForProfessionalVolume =
       engineResult?.type === "professional_volume";
 
@@ -153,6 +155,8 @@ export async function chatRoutes(app: FastifyInstance) {
       engineResult?.reply ||
       forcedCommercialReply ||
       safeReply;
+
+    console.log("FINAL BARISTA REPLY:", baristaReply);
 
     const inferredCoffee =
       inferCoffeeFromText(`${message} ${baristaReply}`) ??
