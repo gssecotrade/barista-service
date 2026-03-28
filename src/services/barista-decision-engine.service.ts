@@ -42,6 +42,14 @@ export type ProfessionalMixLine = {
   priceB2BPerBag: number;
   totalB2C: number;
   totalB2B: number;
+  roundedTargetGrams?: number;
+  formatBreakdown?: Array<{
+    variantId: number | null;
+    bagSizeGrams: number;
+    quantity: number;
+    priceB2C: number;
+    priceB2B: number;
+  }>;
 };
 
 export type ProfessionalMixResult = {
@@ -306,120 +314,174 @@ export function calculateProfessionalCoffeeVolume(input: {
 }
 
 export async function buildProfessionalMixRecommendation(
-    result: ProfessionalVolumeResult
-  ): Promise<ProfessionalMixResult | null> {
-    const mix = buildMomentBasedMix(result);
-  
-    const entries = await Promise.all(
-      (Object.entries(mix) as Array<[CoffeeHandle, number]>).map(
-        async ([handle, percentage]) => {
-          if (percentage < 0.01) return null;
-  
-          const targetKg = result.totalKg * percentage;
-          const variants = await getShopifyVariantsForHandle(handle);
-          const preferred = pickPreferredProfessionalVariant(variants);
-  
-          const fallbackBagSizeGrams = 1000;
-          const effectiveBagSizeGrams =
-            preferred?.bagSizeGrams ?? fallbackBagSizeGrams;
-  
-            const targetGrams = targetKg * 1000;
+  result: ProfessionalVolumeResult
+): Promise<ProfessionalMixResult | null> {
+  const mix = buildMomentBasedMix(result);
 
-            // ordenar formatos disponibles (Shopify) de mayor a menor
-            const sortedVariants = (variants || [])
-              .filter(v => v.bagSizeGrams)
-              .sort((a, b) => b.bagSizeGrams - a.bagSizeGrams);
-            
-            let remainingGrams = targetGrams;
-            
-            const formatBreakdown: Array<{
-              variantId: string;
-              bagSizeGrams: number;
-              quantity: number;
-              priceB2C: number;
-              priceB2B: number;
-            }> = [];
-            
-            for (const variant of sortedVariants) {
-              if (remainingGrams <= 0) break;
-            
-              const qty = Math.floor(remainingGrams / variant.bagSizeGrams);
-            
-              if (qty > 0) {
-                formatBreakdown.push({
-                  variantId: variant.id,
-                  bagSizeGrams: variant.bagSizeGrams,
-                  quantity: qty,
-                  priceB2C: variant.priceB2C,
-                  priceB2B: variant.priceB2B,
-                });
-            
-                remainingGrams -= qty * variant.bagSizeGrams;
-              }
-            }
-            
-            // si queda resto → lo cubres con el formato más pequeño
-            if (remainingGrams > 0 && sortedVariants.length > 0) {
-              const smallest = sortedVariants[sortedVariants.length - 1];
-            
-              formatBreakdown.push({
-                variantId: smallest.id,
-                bagSizeGrams: smallest.bagSizeGrams,
-                quantity: 1,
-                priceB2C: smallest.priceB2C,
-                priceB2B: smallest.priceB2B,
-              });
-            }
-  
-          const priceB2CPerBag = preferred?.priceB2C ?? 0;
-          const priceB2BPerBag = preferred?.priceB2B ?? 0;
-          const totalB2C = roundMoney(priceB2CPerBag * bagCount);
-          const totalB2B = roundMoney(priceB2BPerBag * bagCount);
-  
+  const entries = await Promise.all(
+    (Object.entries(mix) as Array<[CoffeeHandle, number]>).map(
+      async ([handle, percentage]) => {
+        if (percentage < 0.01) return null;
+
+        const targetKg = result.totalKg * percentage;
+        const targetGrams = targetKg * 1000;
+
+        const variants = await getShopifyVariantsForHandle(handle);
+
+        const sortedVariants = (variants || [])
+          .filter((v) => v.bagSizeGrams)
+          .sort((a, b) => b.bagSizeGrams - a.bagSizeGrams);
+
+        if (!sortedVariants.length) {
           return {
             handle,
             name: coffeeNames[handle],
             percentage,
             targetKg: roundToOneDecimal(targetKg),
-            bagSizeGrams: effectiveBagSizeGrams,
-            bagCount,
-            variantId: preferred?.id ?? null,
-            priceB2CPerBag,
-            priceB2BPerBag,
-            totalB2C,
-            totalB2B,
+            bagSizeGrams: 0,
+            bagCount: 0,
+            variantId: null,
+            priceB2CPerBag: 0,
+            priceB2BPerBag: 0,
+            totalB2C: 0,
+            totalB2B: 0,
           } satisfies ProfessionalMixLine;
         }
-      )
-    );
-  
-    const lines = entries.filter(Boolean) as ProfessionalMixLine[];
-  
-    if (!lines.length) return null;
-  
-    const totalEstimatedB2B = roundMoney(
-      lines.reduce((sum, line) => sum + line.totalB2B, 0)
-    );
-    const totalEstimatedB2C = roundMoney(
-      lines.reduce((sum, line) => sum + line.totalB2C, 0)
-    );
-  
-    const cartParts = lines
-      .filter((line) => line.variantId && line.bagCount > 0)
-      .map((line) => `${line.variantId}:${line.bagCount}`);
-  
-    const cartUrl = cartParts.length
-      ? `${SHOPIFY_BASE_URL}/cart/${cartParts.join(",")}`
-      : null;
-  
-    return {
-      totalKg: roundToOneDecimal(result.totalKg),
-      lines,
-      totalEstimatedB2B,
-      totalEstimatedB2C,
-      cartUrl,
-    };
+
+        let remainingGrams = targetGrams;
+
+        const formatBreakdown: Array<{
+          variantId: number | null;
+          bagSizeGrams: number;
+          quantity: number;
+          priceB2C: number;
+          priceB2B: number;
+        }> = [];
+
+        for (const variant of sortedVariants) {
+          if (remainingGrams <= 0) break;
+
+          const qty = Math.floor(remainingGrams / variant.bagSizeGrams);
+
+          if (qty > 0) {
+            formatBreakdown.push({
+              variantId: variant.id,
+              bagSizeGrams: variant.bagSizeGrams,
+              quantity: qty,
+              priceB2C: variant.priceB2C,
+              priceB2B: variant.priceB2B,
+            });
+
+            remainingGrams -= qty * variant.bagSizeGrams;
+          }
+        }
+
+        if (remainingGrams > 0 && sortedVariants.length > 0) {
+          const smallest = sortedVariants[sortedVariants.length - 1];
+
+          const existingSmallest = formatBreakdown.find(
+            (item) => item.bagSizeGrams === smallest.bagSizeGrams
+          );
+
+          if (existingSmallest) {
+            existingSmallest.quantity += 1;
+          } else {
+            formatBreakdown.push({
+              variantId: smallest.id,
+              bagSizeGrams: smallest.bagSizeGrams,
+              quantity: 1,
+              priceB2C: smallest.priceB2C,
+              priceB2B: smallest.priceB2B,
+            });
+          }
+        }
+
+        const totalB2C = roundMoney(
+          formatBreakdown.reduce(
+            (sum, item) => sum + item.priceB2C * item.quantity,
+            0
+          )
+        );
+
+        const totalB2B = roundMoney(
+          formatBreakdown.reduce(
+            (sum, item) => sum + item.priceB2B * item.quantity,
+            0
+          )
+        );
+
+        const totalBoughtGrams = formatBreakdown.reduce(
+          (sum, item) => sum + item.bagSizeGrams * item.quantity,
+          0
+        );
+
+        const primaryLine = formatBreakdown[0] ?? null;
+        const bagCount = formatBreakdown.reduce(
+          (sum, item) => sum + item.quantity,
+          0
+        );
+
+        return {
+          handle,
+          name: coffeeNames[handle],
+          percentage,
+          targetKg: roundToOneDecimal(targetKg),
+          bagSizeGrams: primaryLine?.bagSizeGrams ?? 0,
+          bagCount,
+          variantId: primaryLine?.variantId ?? null,
+          priceB2CPerBag: primaryLine?.priceB2C ?? 0,
+          priceB2BPerBag: primaryLine?.priceB2B ?? 0,
+          totalB2C,
+          totalB2B,
+          roundedTargetGrams: totalBoughtGrams,
+          formatBreakdown,
+        } as ProfessionalMixLine;
+      }
+    )
+  );
+
+  const lines = entries.filter(Boolean) as ProfessionalMixLine[];
+
+  if (!lines.length) return null;
+
+  const totalEstimatedB2B = roundMoney(
+    lines.reduce((sum, line) => sum + line.totalB2B, 0)
+  );
+  const totalEstimatedB2C = roundMoney(
+    lines.reduce((sum, line) => sum + line.totalB2C, 0)
+  );
+
+  const cartParts: string[] = [];
+
+  for (const line of lines) {
+    const breakdown = (line as any).formatBreakdown as
+      | Array<{
+          variantId: number | null;
+          quantity: number;
+        }>
+      | undefined;
+
+    if (!breakdown?.length) continue;
+
+    for (const item of breakdown) {
+      if (item.variantId && item.quantity > 0) {
+        cartParts.push(`${item.variantId}:${item.quantity}`);
+      }
+    }
   }
+
+  const cartUrl = cartParts.length
+    ? `${SHOPIFY_BASE_URL}/cart/${cartParts.join(",")}`
+    : null;
+
+  return {
+    totalKg: roundToOneDecimal(result.totalKg),
+    lines,
+    totalEstimatedB2B,
+    totalEstimatedB2C,
+    cartUrl,
+  };
+}
 
 export function buildProfessionalVolumeReply(
   result: ProfessionalVolumeResult,
