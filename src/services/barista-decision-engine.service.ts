@@ -389,15 +389,35 @@ export function buildProfessionalVolumeReply(
     const totalAssigned = morning + sobremesa + evening + other;
   
     if (totalAssigned > 0) {
-      const catuaiCups = morning + other;
-      const pacamaraCups = sobremesa;
-      const geishaCups = evening;
+      // Reparto por rol de consumo, no solo por volumen bruto
+      const catuaiWeighted =
+        morning * 0.85 +
+        sobremesa * 0.15 +
+        evening * 0.1 +
+        other * 1.0;
   
-      return {
-        catuai: catuaiCups / totalAssigned,
-        pacamara: pacamaraCups / totalAssigned,
-        geisha: geishaCups / totalAssigned,
-      };
+      const pacamaraWeighted =
+        morning * 0.1 +
+        sobremesa * 0.7 +
+        evening * 0.2 +
+        other * 0.0;
+  
+      const geishaWeighted =
+        morning * 0.05 +
+        sobremesa * 0.15 +
+        evening * 0.7 +
+        other * 0.0;
+  
+      const totalWeighted =
+        catuaiWeighted + pacamaraWeighted + geishaWeighted;
+  
+      if (totalWeighted > 0) {
+        return normalizeMix({
+          catuai: catuaiWeighted / totalWeighted,
+          pacamara: pacamaraWeighted / totalWeighted,
+          geisha: geishaWeighted / totalWeighted,
+        });
+      }
     }
   
     // fallback si no hay desglose por momentos
@@ -421,6 +441,26 @@ export function buildProfessionalVolumeReply(
       catuai: 0.8,
       pacamara: 0.2,
       geisha: 0,
+    };
+  }
+
+  function normalizeMix(
+    mix: Record<CoffeeHandle, number>
+  ): Record<CoffeeHandle, number> {
+    const total = Object.values(mix).reduce((sum, value) => sum + value, 0);
+  
+    if (total <= 0) {
+      return {
+        catuai: 0.8,
+        pacamara: 0.2,
+        geisha: 0,
+      };
+    }
+  
+    return {
+      catuai: mix.catuai / total,
+      pacamara: mix.pacamara / total,
+      geisha: mix.geisha / total,
     };
   }
 
