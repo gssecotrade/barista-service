@@ -137,18 +137,35 @@ export async function chatRoutes(app: FastifyInstance) {
           ? engineResult
           : null;
 
+      const hasProfessionalConversationContext =
+        mergedInputState.activeTopic === "professional" ||
+        mergedInputState.lastAssistantSummary?.toLowerCase().includes("negocio") ||
+        mergedInputState.lastAssistantSummary?.toLowerCase().includes("restaurante") ||
+        mergedInputState.lastAssistantSummary?.toLowerCase().includes("carta") ||
+        false;   
+
       const averageCupPrice = extractAverageCupPrice(message);
 
       const forcedCommercialReply =
         engineResult?.type === "professional_volume"
           ? null
           : buildCommercialQuantityReply(message);
-
+        
+      const shouldUseProfessionalPricing =
+        isCupEconomicsIntent(message) &&
+        (Boolean(professionalContext) || hasProfessionalConversationContext);
+        
       const forcedEconomicsReply =
-        isCupEconomicsIntent(message) && professionalContext
+        shouldUseProfessionalPricing
           ? buildProfessionalPricingStrategyReply({
               currentPricePerCup: averageCupPrice ?? 2.5,
-              coffees: professionalContext.mix?.lines ?? [],
+              coffees:
+                professionalContext?.mix?.lines ??
+                [
+                  { handle: "catuai", name: "Catuai", percentage: 0.6, targetKg: 1 },
+                  { handle: "pacamara", name: "Pacamara", percentage: 0.25, targetKg: 1 },
+                  { handle: "geisha", name: "Geisha", percentage: 0.15, targetKg: 1 },
+                ],
             })
           : isCupEconomicsIntent(message)
           ? await buildCupEconomicsReply({ message })
