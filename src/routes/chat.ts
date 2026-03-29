@@ -127,67 +127,73 @@ export async function chatRoutes(app: FastifyInstance) {
   
       const engineResult = await runBaristaDecisionEngine({ message });
       console.log("ENGINE RESULT:", JSON.stringify(engineResult, null, 2));
-      
+
       const suppressProductCardsForProfessionalVolume =
         engineResult?.type === "professional_volume";
-      
-      const professionalContext =
-        engineResult?.type === "professional_volume"
-          ? engineResult
-          : null;
-      
-      const hasProfessionalConversationContext =
-        mergedInputState.activeTopic === "professional" ||
-        mergedInputState.lastAssistantSummary?.toLowerCase().includes("negocio") ||
-        mergedInputState.lastAssistantSummary?.toLowerCase().includes("restaurante") ||
-        mergedInputState.lastAssistantSummary?.toLowerCase().includes("carta") ||
-        false;
-      
+
       const averageCupPrice = extractAverageCupPrice(message);
-      
-      const forcedCommercialReply =
-        engineResult?.type === "professional_volume"
-          ? null
-          : buildCommercialQuantityReply(message);
-      
+
       const shouldUseProfessionalPricing =
-        isCupEconomicsIntent(message) &&
-        (Boolean(professionalContext) || hasProfessionalConversationContext);
-      
+        engineResult?.type === "professional_pricing_strategy";
+
       console.log("PRICING ROUTE CHECK", {
         message,
         isCupEconomics: isCupEconomicsIntent(message),
         engineType: engineResult?.type ?? null,
-        hasProfessionalConversationContext,
         averageCupPrice,
+        shouldUseProfessionalPricing,
       });
 
+      const forcedCommercialReply =
+        engineResult?.type === "professional_volume"
+          ? null
+          : buildCommercialQuantityReply(message);
 
       const forcedEconomicsReply =
         shouldUseProfessionalPricing
           ? buildProfessionalPricingStrategyReply({
               currentPricePerCup: averageCupPrice ?? 2.5,
-              coffees:
-                professionalContext?.mix?.lines ??
-                [
-                  { handle: "catuai", name: "Catuai", percentage: 0.6, targetKg: 1 },
-                  { handle: "pacamara", name: "Pacamara", percentage: 0.25, targetKg: 1 },
-                  { handle: "geisha", name: "Geisha", percentage: 0.15, targetKg: 1 },
-                ],
+              coffees: [
+                {
+                  handle: "catuai",
+                  name: "Catuai",
+                  percentage: 0.42,
+                  targetKg: 20.2,
+                  totalB2B: 436.8,
+                  roundedTargetGrams: 20250,
+                },
+                {
+                  handle: "pacamara",
+                  name: "Pacamara",
+                  percentage: 0.33,
+                  targetKg: 15.8,
+                  totalB2B: 585.0,
+                  roundedTargetGrams: 16000,
+                },
+                {
+                  handle: "geisha",
+                  name: "Geisha",
+                  percentage: 0.25,
+                  targetKg: 12.1,
+                  totalB2B: 1332.8,
+                  roundedTargetGrams: 12250,
+                },
+              ],
             })
           : isCupEconomicsIntent(message)
           ? await buildCupEconomicsReply({ message })
           : null;
-      
-      const safeReply = isCupEconomicsIntent(message)
-        ? rawBaristaReply
-        : sanitizeForbiddenContent(rawBaristaReply);
-      
+
+      const safeReply =
+        shouldUseProfessionalPricing || isCupEconomicsIntent(message)
+          ? rawBaristaReply
+          : sanitizeForbiddenContent(rawBaristaReply);
+
       const baristaReply =
         forcedEconomicsReply ||
         engineResult?.reply ||
         forcedCommercialReply ||
-        safeReply; 
+        safeReply;
   
       const inferredCoffee =
         inferCoffeeFromText(`${message} ${baristaReply}`) ??

@@ -198,25 +198,22 @@ export function isCompleteEconomicsIntent(message: string): boolean {
 }
 
 export function extractAverageCupPrice(message: string): number | null {
-    const normalized = message.replace(",", ".").toLowerCase();
+    const normalized = message.toLowerCase().replace(/\s+/g, " ").trim();
   
     const patterns = [
-      /precio medio de venta por taza(?: es| de)?\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)/i,
-      /precio medio actual(?: es| de)?\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)/i,
-      /mi precio medio de venta(?: por taza)?(?: es| de)?\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)/i,
-      /vendo(?: de media)? .*? a\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)/i,
-      /mi café comercial de media(?: es)?\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)?/i,
-      /mi precio medio(?: actual)?(?: es| de)?\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)/i,
-      /actualmente mi precio medio de venta por taza es de\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)?/i,
-      /precio medio de venta por taza es de\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)?/i,
-      /precio medio por taza es de\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)?/i,
-      /vendo mis caf(?:e|é)s de media a\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)?/i,
+      /precio medio de venta por taza(?: es| de)?\s*(\d+(?:[.,]\d+)?)\s*(?:euros?|€)?/i,
+      /precio medio actual(?: es| de)?\s*(\d+(?:[.,]\d+)?)\s*(?:euros?|€)?/i,
+      /mi precio medio de venta(?: por taza)?(?: es| de)?\s*(\d+(?:[.,]\d+)?)\s*(?:euros?|€)?/i,
+      /actualmente mi precio medio de venta por taza es de\s*(\d+(?:[.,]\d+)?)\s*(?:euros?|€)?/i,
+      /precio medio por taza es de\s*(\d+(?:[.,]\d+)?)\s*(?:euros?|€)?/i,
+      /mi café comercial de media(?: es)?\s*(\d+(?:[.,]\d+)?)\s*(?:euros?|€)?/i,
+      /vendo(?: de media)? .*? a\s*(\d+(?:[.,]\d+)?)\s*(?:euros?|€)?/i,
     ];
   
     for (const pattern of patterns) {
       const match = normalized.match(pattern);
       if (match) {
-        const value = Number(match[1]);
+        const value = Number(match[1].replace(",", "."));
         if (Number.isFinite(value)) return value;
       }
     }
@@ -457,81 +454,66 @@ export function buildProfessionalPricingStrategyReply(params: {
     coffees: ProfessionalMixLineLike[];
   }): string {
     const { currentPricePerCup, coffees } = params;
-
+  
     console.log("USING buildProfessionalPricingStrategyReply", {
-        currentPricePerCup,
-        coffeesCount: coffees.length,
-        coffees,
-      });
+      currentPricePerCup,
+      coffeesCount: coffees.length,
+      coffees,
+    });
   
     const lines: string[] = [];
   
     lines.push(
-      `Partiendo de tu precio medio actual de ${formatEuro(currentPricePerCup)} por taza, el objetivo no es subir precio sin más, sino aumentar margen mejorando la percepción del producto.`,
+      `Partiendo de tu precio medio actual de ${formatEuro(currentPricePerCup)} por taza, la clave no es comprar café más barato, sino elevar valor percibido y margen sin penalizar la rotación.`,
+      "",
+      "Propuesta por variedad:",
       ""
     );
-  
-    lines.push("Análisis y propuesta por variedad:");
   
     for (const coffee of coffees) {
       const gramsPerCup = inferGramsPerCup(coffee.handle);
   
       const totalGrams =
-        typeof coffee.roundedTargetGrams === "number"
+        typeof coffee.roundedTargetGrams === "number" && coffee.roundedTargetGrams > 0
           ? coffee.roundedTargetGrams
           : Math.round(coffee.targetKg * 1000);
   
-      const costPerGram =
-        coffee.totalB2B && totalGrams > 0
-          ? coffee.totalB2B / totalGrams
-          : 0;
-  
+      const totalB2B = typeof coffee.totalB2B === "number" ? coffee.totalB2B : 0;
+      const costPerGram = totalGrams > 0 ? totalB2B / totalGrams : 0;
       const costPerCup = roundMoney(costPerGram * gramsPerCup);
   
-      // 🔥 lógica inteligente
       let suggestedPrice = currentPricePerCup;
   
       if (coffee.handle === "catuai") {
-        suggestedPrice = roundToTenCents(currentPricePerCup + 0.2);
+        suggestedPrice = Math.max(currentPricePerCup + 0.2, 2.2);
+      } else if (coffee.handle === "pacamara") {
+        suggestedPrice = Math.max(currentPricePerCup + 0.5, 2.9);
+      } else if (coffee.handle === "geisha") {
+        suggestedPrice = Math.max(currentPricePerCup + 1.0, 3.8);
       }
   
-      if (coffee.handle === "pacamara") {
-        suggestedPrice = roundToTenCents(currentPricePerCup + 0.4);
-      }
-  
-      if (coffee.handle === "geisha") {
-        suggestedPrice = roundToTenCents(currentPricePerCup + 0.8);
-      }
+      suggestedPrice = roundToTenCents(suggestedPrice);
   
       const marginPerCup = roundMoney(suggestedPrice - costPerCup);
-      const currentMargin = roundMoney(currentPricePerCup - costPerCup);
-      const marginIncrease = roundMoney(marginPerCup - currentMargin);
   
-      lines.push(`${coffee.name}:`);
-      lines.push(`- coste real por taza: ${formatEuro(costPerCup)}`);
-      lines.push(`- precio actual: ${formatEuro(currentPricePerCup)}`);
-      lines.push(`- precio recomendado: ${formatEuro(suggestedPrice)}`);
-      lines.push(`- margen actual: ${formatEuro(currentMargin)}`);
-      lines.push(`- margen potencial: ${formatEuro(marginPerCup)}`);
-      lines.push(`- incremento de margen: +${formatEuro(marginIncrease)}`);
-      lines.push(`- rol en carta: ${describeRole(coffee.handle)}`);
-      lines.push("");
+      lines.push(
+        `${coffee.name}:`,
+        `- coste real por taza: ${formatEuro(costPerCup)}`,
+        `- precio recomendado por taza: ${formatEuro(suggestedPrice)}`,
+        `- margen por taza: ${formatEuro(marginPerCup)}`,
+        `- rol en carta: ${describeRole(coffee.handle)}`,
+        ""
+      );
     }
   
     lines.push(
       "Conclusión:",
-      "El cambio a café de especialidad no reduce margen, lo amplía.",
+      "El café de especialidad puede costarte más por kilo, pero también te permite vender mejor cada taza, aumentar margen, reforzar percepción de calidad y fidelizar más.",
       "",
-      "La clave no es el coste del café, sino el reposicionamiento del precio:",
-      "- subes ticket medio",
-      "- aumentas margen por taza",
-      "- mejoras percepción de calidad",
-      "- fidelizas cliente sin perder rotación",
-      "",
-      "Estás vendiendo mejor café… y cobrando mejor por ello."
+      "Estrategia recomendada: mantener Catuai como base de rotación, usar Pacamara para sobremesa y posicionar Geisha como propuesta premium."
     );
   
-    return lines.join("\n");
+    return lines.join("\n").trim();
   }
 
 function inferGramsPerCup(handle: CoffeeHandle): number {

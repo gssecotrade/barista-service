@@ -69,6 +69,12 @@ export type DecisionEngineResult =
       mix: ProfessionalMixResult | null;
     }
   | {
+      type: "professional_pricing_strategy";
+      reply: string;
+      meta: null;
+      mix: null;
+    }
+  | {
       type: "monthly_quantity";
       reply: string;
     }
@@ -106,19 +112,15 @@ export async function runBaristaDecisionEngine(params: {
 }): Promise<DecisionEngineResult> {
   const { message } = params;
   const intent = detectDecisionIntent(message);
+
   console.log("DECISION INTENT:", intent, "MESSAGE:", message);
 
   if (intent === "professional_volume") {
     const parsed = parseProfessionalVolumeQuery(message);
-    console.log("PROFESSIONAL PARSED:", parsed);
-
     if (!parsed) return null;
 
     const calculated = calculateProfessionalCoffeeVolume(parsed);
-    console.log("PROFESSIONAL CALCULATED:", calculated);
-
     const mix = await buildProfessionalMixRecommendation(calculated);
-    console.log("PROFESSIONAL MIX:", JSON.stringify(mix, null, 2));
 
     return {
       type: "professional_volume",
@@ -132,18 +134,18 @@ export async function runBaristaDecisionEngine(params: {
     return {
       type: "professional_pricing_strategy",
       reply: "",
-    } as any;
+      meta: null,
+      mix: null,
+    };
   }
 
   if (intent === "monthly_quantity") {
-    const quantityReply = buildCommercialQuantityReplyAdvanced(message);
-    console.log("MONTHLY QUANTITY REPLY:", quantityReply);
-
-    if (!quantityReply) return null;
+    const reply = buildCommercialQuantityReplyAdvanced(message);
+    if (!reply) return null;
 
     return {
       type: "monthly_quantity",
-      reply: quantityReply,
+      reply,
     };
   }
 
@@ -185,24 +187,34 @@ export function isProfessionalVolumeIntent(text: string): boolean {
 }
 
 export function isProfessionalPricingStrategyIntent(text: string): boolean {
-  return (
-    (text.includes("restaurante") ||
-      text.includes("cafeteria") ||
-      text.includes("cafetería") ||
-      text.includes("hotel") ||
-      text.includes("carta") ||
-      text.includes("horeca")) &&
-    (text.includes("precio por taza") ||
-      text.includes("margen por taza") ||
-      text.includes("rentabilidad") ||
-      text.includes("precio medio") ||
-      text.includes("precio de venta") ||
-      text.includes("a que precio vender") ||
-      text.includes("a qué precio vender") ||
-      text.includes("beneficio por taza") ||
-      text.includes("coste por taza") ||
-      text.includes("costo por taza"))
-  );
+  const hasBusinessSignal =
+    text.includes("restaurante") ||
+    text.includes("cafeteria") ||
+    text.includes("cafetería") ||
+    text.includes("hotel") ||
+    text.includes("horeca") ||
+    text.includes("carta") ||
+    text.includes("propuesta para cada variedad") ||
+    text.includes("propuesta de suministro") ||
+    text.includes("cada variedad");
+
+  const hasPricingSignal =
+    text.includes("coste por taza") ||
+    text.includes("costo por taza") ||
+    text.includes("precio por taza") ||
+    text.includes("precio de venta") ||
+    text.includes("precio sugerido") ||
+    text.includes("precio recomendado") ||
+    text.includes("margen por taza") ||
+    text.includes("rentabilidad mensual") ||
+    text.includes("rentabilidad") ||
+    text.includes("beneficio por taza") ||
+    text.includes("precio medio") ||
+    text.includes("actualmente mi precio medio") ||
+    text.includes("a que precio deberia vender") ||
+    text.includes("a qué precio debería vender");
+
+  return hasBusinessSignal || hasPricingSignal;
 }
 
 export function isMonthlyQuantityIntent(message: string): boolean {
