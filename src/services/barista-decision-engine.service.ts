@@ -9,6 +9,7 @@ type BusinessMode =
 
 export type BaristaDecisionIntent =
   | "professional_volume"
+    "professional_pricing_strategy"
   | "cup_economics"
   | "monthly_quantity"
   | "general";
@@ -127,6 +128,13 @@ export async function runBaristaDecisionEngine(params: {
     };
   }
 
+  if (intent === "professional_pricing_strategy") {
+    return {
+      type: "professional_pricing_strategy",
+      reply: "",
+    } as any;
+  }
+
   if (intent === "monthly_quantity") {
     const quantityReply = buildCommercialQuantityReplyAdvanced(message);
     console.log("MONTHLY QUANTITY REPLY:", quantityReply);
@@ -146,6 +154,7 @@ export function detectDecisionIntent(message: string): BaristaDecisionIntent {
   const text = normalize(message);
 
   if (isProfessionalVolumeIntent(text)) return "professional_volume";
+  if (isProfessionalPricingStrategyIntent(text)) return "professional_pricing_strategy";
   if (isMonthlyQuantityIntent(text)) return "monthly_quantity";
 
   return "general";
@@ -172,6 +181,27 @@ export function isProfessionalVolumeIntent(text: string): boolean {
       text.includes("cuanto cafe comprar") ||
       text.includes("volumen de cafe") ||
       text.includes("volumen de café"))
+  );
+}
+
+export function isProfessionalPricingStrategyIntent(text: string): boolean {
+  return (
+    (text.includes("restaurante") ||
+      text.includes("cafeteria") ||
+      text.includes("cafetería") ||
+      text.includes("hotel") ||
+      text.includes("carta") ||
+      text.includes("horeca")) &&
+    (text.includes("precio por taza") ||
+      text.includes("margen por taza") ||
+      text.includes("rentabilidad") ||
+      text.includes("precio medio") ||
+      text.includes("precio de venta") ||
+      text.includes("a que precio vender") ||
+      text.includes("a qué precio vender") ||
+      text.includes("beneficio por taza") ||
+      text.includes("coste por taza") ||
+      text.includes("costo por taza"))
   );
 }
 

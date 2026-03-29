@@ -14,7 +14,6 @@ import {
   extractAverageCupPrice,
   isCupEconomicsIntent,
 } from "../services/barista-pricing.service";
-
 import { runBaristaDecisionEngine } from "../services/barista-decision-engine.service";
 
 const chatBodySchema = z.object({
