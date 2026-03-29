@@ -17,13 +17,21 @@ type ProductPricingInfo = {
 };
 
 type ProfessionalMixLineLike = {
-  handle: CoffeeHandle;
-  name: string;
-  percentage: number;
-  targetKg: number;
-  roundedTargetGrams?: number;
-  totalB2B?: number;
-  totalB2C?: number;
+    handle: CoffeeHandle;
+    name: string;
+    percentage: number;
+    targetKg: number;
+    roundedTargetGrams?: number;
+    totalB2B?: number;
+    totalB2C?: number;
+    formatBreakdown?: Array<{
+      variantId?: number | string | null;
+      bagSizeGrams: number;
+      quantity: number;
+      priceB2B?: number;
+      priceB2C?: number;
+    }>;
+  };
 };
 
 type ProfessionalEngineResultLike = {
@@ -473,13 +481,7 @@ export function buildProfessionalPricingStrategyReply(params: {
     for (const coffee of coffees) {
       const gramsPerCup = inferGramsPerCup(coffee.handle);
   
-      const totalGrams =
-        typeof coffee.roundedTargetGrams === "number" && coffee.roundedTargetGrams > 0
-          ? coffee.roundedTargetGrams
-          : Math.round(coffee.targetKg * 1000);
-  
-      const totalB2B = typeof coffee.totalB2B === "number" ? coffee.totalB2B : 0;
-      const costPerGram = totalGrams > 0 ? totalB2B / totalGrams : 0;
+      const costPerGram = computeWeightedB2BCostPerGram(coffee);
       const costPerCup = roundMoney(costPerGram * gramsPerCup);
   
       let suggestedPrice = currentPricePerCup;
@@ -514,6 +516,45 @@ export function buildProfessionalPricingStrategyReply(params: {
     );
   
     return lines.join("\n").trim();
+  }
+
+  function computeWeightedB2BCostPerGram(coffee: {
+    roundedTargetGrams?: number;
+    totalB2B?: number;
+    formatBreakdown?: Array<{
+      bagSizeGrams: number;
+      quantity: number;
+      priceB2B?: number;
+      priceB2C?: number;
+    }>;
+  }): number {
+    const breakdown = coffee.formatBreakdown ?? [];
+  
+    if (breakdown.length > 0) {
+      const totalCostB2B = breakdown.reduce((sum, item) => {
+        const itemPriceB2B =
+          typeof item.priceB2B === "number"
+            ? item.priceB2B
+            : typeof item.priceB2C === "number"
+            ? item.priceB2C * 0.8
+            : 0;
+  
+        return sum + itemPriceB2B * item.quantity;
+      }, 0);
+  
+      const totalGrams = breakdown.reduce((sum, item) => {
+        return sum + item.bagSizeGrams * item.quantity;
+      }, 0);
+  
+      return totalGrams > 0 ? totalCostB2B / totalGrams : 0;
+    }
+  
+    const fallbackGrams =
+      typeof coffee.roundedTargetGrams === "number" ? coffee.roundedTargetGrams : 0;
+  
+    return fallbackGrams > 0 && typeof coffee.totalB2B === "number"
+      ? coffee.totalB2B / fallbackGrams
+      : 0;
   }
 
 function inferGramsPerCup(handle: CoffeeHandle): number {

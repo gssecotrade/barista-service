@@ -407,11 +407,11 @@ export async function buildProfessionalMixRecommendation(
 
           if (qty > 0) {
             formatBreakdown.push({
-              variantId: variant.id,
-              bagSizeGrams: variant.bagSizeGrams,
-              quantity: qty,
-              priceB2C: variant.priceB2C,
-              priceB2B: variant.priceB2B,
+              variantId: typeof smallest.id === "number" ? smallest.id : null,
+              bagSizeGrams: smallest.bagSizeGrams,
+              quantity: 1,
+              priceB2C: smallest.priceB2C,
+              priceB2B: smallest.priceB2B,
             });
 
             remainingGrams -= qty * variant.bagSizeGrams;
@@ -468,16 +468,32 @@ export async function buildProfessionalMixRecommendation(
           name: coffeeNames[handle],
           percentage,
           targetKg: roundToOneDecimal(targetKg),
-          bagSizeGrams: primaryLine?.bagSizeGrams ?? 0,
-          bagCount,
-          variantId: primaryLine?.variantId ?? null,
-          priceB2CPerBag: primaryLine?.priceB2C ?? 0,
-          priceB2BPerBag: primaryLine?.priceB2B ?? 0,
-          totalB2C,
-          totalB2B,
-          roundedTargetGrams: totalBoughtGrams,
-          formatBreakdown,
-        } as ProfessionalMixLine;
+          roundedTargetGrams: Math.round(
+            formatBreakdown.reduce(
+              (sum, item) => sum + item.bagSizeGrams * item.quantity,
+              0
+            )
+          ),
+          bagSizeGrams: effectiveBagSizeGrams,
+          bagCount: formatBreakdown.reduce((sum, item) => sum + item.quantity, 0),
+          variantId: preferred?.id ?? null,
+          priceB2CPerBag,
+          priceB2BPerBag,
+          totalB2C: roundMoney(
+            formatBreakdown.reduce((sum, item) => sum + item.priceB2C * item.quantity, 0)
+          ),
+          totalB2B: roundMoney(
+            formatBreakdown.reduce((sum, item) => sum + item.priceB2B * item.quantity, 0)
+          ),
+          formatBreakdown: formatBreakdown.map((item) => ({
+            variantId:
+              typeof item.variantId === "number" ? item.variantId : null,
+            bagSizeGrams: item.bagSizeGrams,
+            quantity: item.quantity,
+            priceB2C: item.priceB2C,
+            priceB2B: item.priceB2B,
+          })),
+        } satisfies ProfessionalMixLine;
       }
     )
   );
