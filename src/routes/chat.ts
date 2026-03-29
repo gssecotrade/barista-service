@@ -155,6 +155,15 @@ export async function chatRoutes(app: FastifyInstance) {
         isCupEconomicsIntent(message) &&
         (Boolean(professionalContext) || hasProfessionalConversationContext);
       
+      console.log("PRICING ROUTE CHECK", {
+        message,
+        isCupEconomics: isCupEconomicsIntent(message),
+        engineType: engineResult?.type ?? null,
+        hasProfessionalConversationContext,
+        averageCupPrice,
+      });
+
+
       const forcedEconomicsReply =
         shouldUseProfessionalPricing
           ? buildProfessionalPricingStrategyReply({
