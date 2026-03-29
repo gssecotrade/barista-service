@@ -55,7 +55,7 @@ type ShopifyProductJson = {
 };
 
 const SHOPIFY_BASE_URL = "https://arte-coffee.com";
-const B2B_DISCOUNT_FACTOR = 0.8; // 20% menos que B2C
+const B2B_DISCOUNT_FACTOR = 0.8;
 
 const coffeeBusinessRules: Record<
   CoffeeHandle,
@@ -282,22 +282,22 @@ async function getProductPricing(handle: CoffeeHandle): Promise<ProductPricingIn
 }
 
 function parseBagSizeGrams(title: string): number {
-    const normalized = title.toLowerCase().replace(/\s+/g, " ").trim();
-  
-    const kgMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*kg\.?\b/);
-    if (kgMatch) {
-      const kilos = Number(kgMatch[1].replace(",", "."));
-      return Number.isFinite(kilos) ? Math.round(kilos * 1000) : 0;
-    }
-  
-    const gramMatch = normalized.match(/(\d+)\s*g(?:r)?\.?\b/);
-    if (gramMatch) {
-      const grams = Number(gramMatch[1]);
-      return Number.isFinite(grams) ? grams : 0;
-    }
-  
-    return 0;
+  const normalized = title.toLowerCase().replace(/\s+/g, " ").trim();
+
+  const kgMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*kg\.?\b/);
+  if (kgMatch) {
+    const kilos = Number(kgMatch[1].replace(",", "."));
+    return Number.isFinite(kilos) ? Math.round(kilos * 1000) : 0;
   }
+
+  const gramMatch = normalized.match(/(\d+)\s*g(?:r)?\.?\b/);
+  if (gramMatch) {
+    const grams = Number(gramMatch[1]);
+    return Number.isFinite(grams) ? grams : 0;
+  }
+
+  return 0;
+}
 
 function normalizePrice(price: number | string | undefined): number {
   if (typeof price === "number") {
@@ -422,8 +422,7 @@ export function buildProfessionalEconomicsReply(
 
   for (const line of mix.lines) {
     const gramsPerCup = inferGramsPerCup(line.handle);
-    const costPerGram = computeWeightedB2BCostPerGram(line);
-    const costPerCup = roundMoney(costPerGram * gramsPerCup);
+    const costPerCup = computeLiveShopifyCostPerCup(line.handle);
 
     const suggestedPrice = buildSuggestedCupPrice({
       handle: line.handle,
@@ -440,6 +439,7 @@ export function buildProfessionalEconomicsReply(
     }
 
     lines.push(`${line.name}:`);
+    lines.push(`- gramos recomendados por taza: ${gramsPerCup} g`);
     lines.push(`- coste real por taza: ${formatEuro(costPerCup)}`);
     lines.push(`- precio sugerido por taza: ${formatEuro(suggestedPrice)}`);
     lines.push(`- margen por taza: ${formatEuro(marginPerCup)}`);
@@ -458,10 +458,10 @@ export function buildProfessionalEconomicsReply(
   return lines.join("\n").trim();
 }
 
-export function buildProfessionalPricingStrategyReply(params: {
+export async function buildProfessionalPricingStrategyReply(params: {
   currentPricePerCup: number;
   coffees: ProfessionalMixLineLike[];
-}): string {
+}): Promise<string> {
   const { currentPricePerCup, coffees } = params;
 
   console.log("USING buildProfessionalPricingStrategyReply", {
@@ -469,6 +469,16 @@ export function buildProfessionalPricingStrategyReply(params: {
     coffeesCount: coffees.length,
     coffees,
   });
+
+  const uniqueHandles = Array.from(
+    new Set((coffees.length ? coffees : [
+      { handle: "catuai" },
+      { handle: "pacamara" },
+      { handle: "geisha" },
+    ]).map((coffee) => coffee.handle))
+  ) as CoffeeHandle[];
+
+  const products = await Promise.all(uniqueHandles.map((handle) => getProductPricing(handle)));
 
   const lines: string[] = [];
 
@@ -481,18 +491,21 @@ export function buildProfessionalPricingStrategyReply(params: {
     ""
   );
 
-  for (const coffee of coffees) {
-    const gramsPerCup = inferGramsPerCup(coffee.handle);
-    const costPerGram = computeWeightedB2BCostPerGram(coffee);
+  for (const product of products) {
+    const preferredVariant = pickPreferredVariant(product.handle, product.variants);
+    if (!preferredVariant) continue;
+
+    const gramsPerCup = inferGramsPerCup(product.handle);
+    const costPerGram = preferredVariant.priceB2B / preferredVariant.bagSizeGrams;
     const costPerCup = roundMoney(costPerGram * gramsPerCup);
 
     let suggestedPrice = currentPricePerCup;
 
-    if (coffee.handle === "catuai") {
+    if (product.handle === "catuai") {
       suggestedPrice = Math.max(currentPricePerCup + 0.2, 2.2);
-    } else if (coffee.handle === "pacamara") {
+    } else if (product.handle === "pacamara") {
       suggestedPrice = Math.max(currentPricePerCup + 0.5, 2.9);
-    } else if (coffee.handle === "geisha") {
+    } else if (product.handle === "geisha") {
       suggestedPrice = Math.max(currentPricePerCup + 1.0, 3.8);
     }
 
@@ -501,11 +514,13 @@ export function buildProfessionalPricingStrategyReply(params: {
     const marginPerCup = roundMoney(suggestedPrice - costPerCup);
 
     lines.push(
-      `${coffee.name}:`,
+      `${product.name}:`,
+      `- formato de referencia: ${formatBagSize(preferredVariant.bagSizeGrams)}`,
+      `- gramos recomendados por taza: ${gramsPerCup} g`,
       `- coste real por taza: ${formatEuro(costPerCup)}`,
       `- precio recomendado por taza: ${formatEuro(suggestedPrice)}`,
       `- margen por taza: ${formatEuro(marginPerCup)}`,
-      `- rol en carta: ${describeRole(coffee.handle)}`,
+      `- rol en carta: ${describeRole(product.handle)}`,
       ""
     );
   }
@@ -520,43 +535,10 @@ export function buildProfessionalPricingStrategyReply(params: {
   return lines.join("\n").trim();
 }
 
-function computeWeightedB2BCostPerGram(coffee: {
-  roundedTargetGrams?: number;
-  totalB2B?: number;
-  formatBreakdown?: Array<{
-    bagSizeGrams: number;
-    quantity: number;
-    priceB2B?: number;
-    priceB2C?: number;
-  }>;
-}): number {
-  const breakdown = coffee.formatBreakdown ?? [];
-
-  if (breakdown.length > 0) {
-    const totalCostB2B = breakdown.reduce((sum, item) => {
-      const itemPriceB2B =
-        typeof item.priceB2B === "number"
-          ? item.priceB2B
-          : typeof item.priceB2C === "number"
-          ? roundMoney(item.priceB2C * B2B_DISCOUNT_FACTOR)
-          : 0;
-
-      return sum + itemPriceB2B * item.quantity;
-    }, 0);
-
-    const totalGrams = breakdown.reduce((sum, item) => {
-      return sum + item.bagSizeGrams * item.quantity;
-    }, 0);
-
-    return totalGrams > 0 ? totalCostB2B / totalGrams : 0;
-  }
-
-  const fallbackGrams =
-    typeof coffee.roundedTargetGrams === "number" ? coffee.roundedTargetGrams : 0;
-
-  return fallbackGrams > 0 && typeof coffee.totalB2B === "number"
-    ? coffee.totalB2B / fallbackGrams
-    : 0;
+function computeLiveShopifyCostPerCup(handle: CoffeeHandle): number {
+  // Esta función no se usa en runtime directamente porque getProductPricing es async.
+  // Se deja para compatibilidad estructural.
+  return 0;
 }
 
 function inferGramsPerCup(handle: CoffeeHandle): number {

@@ -151,7 +151,7 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const forcedEconomicsReply =
         shouldUseProfessionalPricing
-          ? buildProfessionalPricingStrategyReply({
+          ? await buildProfessionalPricingStrategyReply({
               currentPricePerCup: averageCupPrice ?? 2.5,
               coffees: [
                 {
