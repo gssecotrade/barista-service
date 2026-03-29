@@ -17,21 +17,20 @@ type ProductPricingInfo = {
 };
 
 type ProfessionalMixLineLike = {
-    handle: CoffeeHandle;
-    name: string;
-    percentage: number;
-    targetKg: number;
-    roundedTargetGrams?: number;
-    totalB2B?: number;
-    totalB2C?: number;
-    formatBreakdown?: Array<{
-      variantId?: number | string | null;
-      bagSizeGrams: number;
-      quantity: number;
-      priceB2B?: number;
-      priceB2C?: number;
-    }>;
-  };
+  handle: CoffeeHandle;
+  name: string;
+  percentage: number;
+  targetKg: number;
+  roundedTargetGrams?: number;
+  totalB2B?: number;
+  totalB2C?: number;
+  formatBreakdown?: Array<{
+    variantId?: number | string | null;
+    bagSizeGrams: number;
+    quantity: number;
+    priceB2B?: number;
+    priceB2C?: number;
+  }>;
 };
 
 type ProfessionalEngineResultLike = {
