@@ -365,30 +365,12 @@ export async function buildProfessionalMixRecommendation(
       async ([handle, percentage]) => {
         if (percentage < 0.01) return null;
 
-        const targetKg = result.totalKg * percentage;
         const targetGrams = targetKg * 1000;
 
-        const variants = await getShopifyVariantsForHandle(handle);
-
+        // ordenar formatos disponibles (Shopify) de mayor a menor
         const sortedVariants = (variants || [])
           .filter((v) => v.bagSizeGrams)
           .sort((a, b) => b.bagSizeGrams - a.bagSizeGrams);
-
-        if (!sortedVariants.length) {
-          return {
-            handle,
-            name: coffeeNames[handle],
-            percentage,
-            targetKg: roundToOneDecimal(targetKg),
-            bagSizeGrams: 0,
-            bagCount: 0,
-            variantId: null,
-            priceB2CPerBag: 0,
-            priceB2BPerBag: 0,
-            totalB2C: 0,
-            totalB2B: 0,
-          } satisfies ProfessionalMixLine;
-        }
 
         let remainingGrams = targetGrams;
 
@@ -407,35 +389,29 @@ export async function buildProfessionalMixRecommendation(
 
           if (qty > 0) {
             formatBreakdown.push({
-              variantId: typeof smallest.id === "number" ? smallest.id : null,
-              bagSizeGrams: smallest.bagSizeGrams,
-              quantity: 1,
-              priceB2C: smallest.priceB2C,
-              priceB2B: smallest.priceB2B,
+              variantId: typeof variant.id === "number" ? variant.id : null,
+              bagSizeGrams: variant.bagSizeGrams,
+              quantity: qty,
+              priceB2C: variant.priceB2C,
+              priceB2B: variant.priceB2B,
             });
 
             remainingGrams -= qty * variant.bagSizeGrams;
           }
         }
 
-        if (remainingGrams > 0 && sortedVariants.length > 0) {
-          const smallest = sortedVariants[sortedVariants.length - 1];
+        // si queda resto → lo cubres con el formato más pequeño disponible
+        const smallestVariant =
+          sortedVariants.length > 0 ? sortedVariants[sortedVariants.length - 1] : null;
 
-          const existingSmallest = formatBreakdown.find(
-            (item) => item.bagSizeGrams === smallest.bagSizeGrams
-          );
-
-          if (existingSmallest) {
-            existingSmallest.quantity += 1;
-          } else {
-            formatBreakdown.push({
-              variantId: smallest.id,
-              bagSizeGrams: smallest.bagSizeGrams,
-              quantity: 1,
-              priceB2C: smallest.priceB2C,
-              priceB2B: smallest.priceB2B,
-            });
-          }
+        if (remainingGrams > 0 && smallestVariant) {
+          formatBreakdown.push({
+            variantId: typeof smallestVariant.id === "number" ? smallestVariant.id : null,
+            bagSizeGrams: smallestVariant.bagSizeGrams,
+            quantity: 1,
+            priceB2C: smallestVariant.priceB2C,
+            priceB2B: smallestVariant.priceB2B,
+          });
         }
 
         const totalB2C = roundMoney(
