@@ -365,9 +365,16 @@ export async function buildProfessionalMixRecommendation(
       async ([handle, percentage]) => {
         if (percentage < 0.01) return null;
 
+        const targetKg = result.totalKg * percentage;
+        const variants = await getShopifyVariantsForHandle(handle);
+        const preferred = pickPreferredProfessionalVariant(variants);
+
+        const fallbackBagSizeGrams = 1000;
+        const effectiveBagSizeGrams =
+          preferred?.bagSizeGrams ?? fallbackBagSizeGrams;
+
         const targetGrams = targetKg * 1000;
 
-        // ordenar formatos disponibles (Shopify) de mayor a menor
         const sortedVariants = (variants || [])
           .filter((v) => v.bagSizeGrams)
           .sort((a, b) => b.bagSizeGrams - a.bagSizeGrams);
@@ -400,19 +407,35 @@ export async function buildProfessionalMixRecommendation(
           }
         }
 
-        // si queda resto → lo cubres con el formato más pequeño disponible
         const smallestVariant =
-          sortedVariants.length > 0 ? sortedVariants[sortedVariants.length - 1] : null;
+          sortedVariants.length > 0
+            ? sortedVariants[sortedVariants.length - 1]
+            : null;
 
         if (remainingGrams > 0 && smallestVariant) {
           formatBreakdown.push({
-            variantId: typeof smallestVariant.id === "number" ? smallestVariant.id : null,
+            variantId:
+              typeof smallestVariant.id === "number"
+                ? smallestVariant.id
+                : null,
             bagSizeGrams: smallestVariant.bagSizeGrams,
             quantity: 1,
             priceB2C: smallestVariant.priceB2C,
             priceB2B: smallestVariant.priceB2B,
           });
         }
+
+        const roundedTargetGrams = Math.round(
+          formatBreakdown.reduce(
+            (sum, item) => sum + item.bagSizeGrams * item.quantity,
+            0
+          )
+        );
+
+        const bagCount = formatBreakdown.reduce(
+          (sum, item) => sum + item.quantity,
+          0
+        );
 
         const totalB2C = roundMoney(
           formatBreakdown.reduce(
@@ -428,47 +451,23 @@ export async function buildProfessionalMixRecommendation(
           )
         );
 
-        const totalBoughtGrams = formatBreakdown.reduce(
-          (sum, item) => sum + item.bagSizeGrams * item.quantity,
-          0
-        );
-
-        const primaryLine = formatBreakdown[0] ?? null;
-        const bagCount = formatBreakdown.reduce(
-          (sum, item) => sum + item.quantity,
-          0
-        );
+        const priceB2CPerBag = preferred?.priceB2C ?? 0;
+        const priceB2BPerBag = preferred?.priceB2B ?? 0;
 
         return {
           handle,
           name: coffeeNames[handle],
           percentage,
           targetKg: roundToOneDecimal(targetKg),
-          roundedTargetGrams: Math.round(
-            formatBreakdown.reduce(
-              (sum, item) => sum + item.bagSizeGrams * item.quantity,
-              0
-            )
-          ),
+          roundedTargetGrams,
           bagSizeGrams: effectiveBagSizeGrams,
-          bagCount: formatBreakdown.reduce((sum, item) => sum + item.quantity, 0),
+          bagCount,
           variantId: preferred?.id ?? null,
           priceB2CPerBag,
           priceB2BPerBag,
-          totalB2C: roundMoney(
-            formatBreakdown.reduce((sum, item) => sum + item.priceB2C * item.quantity, 0)
-          ),
-          totalB2B: roundMoney(
-            formatBreakdown.reduce((sum, item) => sum + item.priceB2B * item.quantity, 0)
-          ),
-          formatBreakdown: formatBreakdown.map((item) => ({
-            variantId:
-              typeof item.variantId === "number" ? item.variantId : null,
-            bagSizeGrams: item.bagSizeGrams,
-            quantity: item.quantity,
-            priceB2C: item.priceB2C,
-            priceB2B: item.priceB2B,
-          })),
+          totalB2C,
+          totalB2B,
+          formatBreakdown,
         } satisfies ProfessionalMixLine;
       }
     )
@@ -481,28 +480,16 @@ export async function buildProfessionalMixRecommendation(
   const totalEstimatedB2B = roundMoney(
     lines.reduce((sum, line) => sum + line.totalB2B, 0)
   );
+
   const totalEstimatedB2C = roundMoney(
     lines.reduce((sum, line) => sum + line.totalB2C, 0)
   );
 
-  const cartParts: string[] = [];
-
-  for (const line of lines) {
-    const breakdown = (line as any).formatBreakdown as
-      | Array<{
-          variantId: number | null;
-          quantity: number;
-        }>
-      | undefined;
-
-    if (!breakdown?.length) continue;
-
-    for (const item of breakdown) {
-      if (item.variantId && item.quantity > 0) {
-        cartParts.push(`${item.variantId}:${item.quantity}`);
-      }
-    }
-  }
+  const cartParts = lines.flatMap((line) =>
+    (line.formatBreakdown ?? [])
+      .filter((item) => item.variantId && item.quantity > 0)
+      .map((item) => `${item.variantId}:${item.quantity}`)
+  );
 
   const cartUrl = cartParts.length
     ? `${SHOPIFY_BASE_URL}/cart/${cartParts.join(",")}`
