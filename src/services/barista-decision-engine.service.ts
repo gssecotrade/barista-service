@@ -889,18 +889,16 @@ function pickPreferredProfessionalVariant(
 function parseBagSizeGrams(title: string): number {
   const normalized = title.toLowerCase().replace(/\s+/g, " ").trim();
 
-  // 1 kg / 0.5 kg / 0,25 kg
-  const kgMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*kg\b/);
+  const kgMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*kg\.?\b/);
   if (kgMatch) {
     const kilos = Number(kgMatch[1].replace(",", "."));
     return Number.isFinite(kilos) ? Math.round(kilos * 1000) : 0;
   }
 
-  // 250 g / 250gr / 250 gr / 250 gr.
-  const gramMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*g(?:r)?\.?\b/);
+  const gramMatch = normalized.match(/(\d+)\s*g(?:r)?\.?\b/);
   if (gramMatch) {
-    const grams = Number(gramMatch[1].replace(",", "."));
-    return Number.isFinite(grams) ? Math.round(grams) : 0;
+    const grams = Number(gramMatch[1]);
+    return Number.isFinite(grams) ? grams : 0;
   }
 
   return 0;

@@ -282,22 +282,22 @@ async function getProductPricing(handle: CoffeeHandle): Promise<ProductPricingIn
 }
 
 function parseBagSizeGrams(title: string): number {
-  const normalized = title.toLowerCase().replace(/\s+/g, " ").trim();
-
-  const kgMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*kg/);
-  if (kgMatch) {
-    const kilos = Number(kgMatch[1].replace(",", "."));
-    return Number.isFinite(kilos) ? Math.round(kilos * 1000) : 0;
+    const normalized = title.toLowerCase().replace(/\s+/g, " ").trim();
+  
+    const kgMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*kg\.?\b/);
+    if (kgMatch) {
+      const kilos = Number(kgMatch[1].replace(",", "."));
+      return Number.isFinite(kilos) ? Math.round(kilos * 1000) : 0;
+    }
+  
+    const gramMatch = normalized.match(/(\d+)\s*g(?:r)?\.?\b/);
+    if (gramMatch) {
+      const grams = Number(gramMatch[1]);
+      return Number.isFinite(grams) ? grams : 0;
+    }
+  
+    return 0;
   }
-
-  const gramMatch = normalized.match(/(\d+)\s*g\b/);
-  if (gramMatch) {
-    const grams = Number(gramMatch[1]);
-    return Number.isFinite(grams) ? grams : 0;
-  }
-
-  return 0;
-}
 
 function normalizePrice(price: number | string | undefined): number {
   if (typeof price === "number") {
