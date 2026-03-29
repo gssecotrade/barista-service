@@ -128,33 +128,33 @@ export async function chatRoutes(app: FastifyInstance) {
   
       const engineResult = await runBaristaDecisionEngine({ message });
       console.log("ENGINE RESULT:", JSON.stringify(engineResult, null, 2));
-
+      
       const suppressProductCardsForProfessionalVolume =
         engineResult?.type === "professional_volume";
-
+      
       const professionalContext =
         engineResult?.type === "professional_volume"
           ? engineResult
           : null;
-
+      
       const hasProfessionalConversationContext =
         mergedInputState.activeTopic === "professional" ||
         mergedInputState.lastAssistantSummary?.toLowerCase().includes("negocio") ||
         mergedInputState.lastAssistantSummary?.toLowerCase().includes("restaurante") ||
         mergedInputState.lastAssistantSummary?.toLowerCase().includes("carta") ||
-        false;   
-
+        false;
+      
       const averageCupPrice = extractAverageCupPrice(message);
-
+      
       const forcedCommercialReply =
         engineResult?.type === "professional_volume"
           ? null
           : buildCommercialQuantityReply(message);
-        
+      
       const shouldUseProfessionalPricing =
         isCupEconomicsIntent(message) &&
         (Boolean(professionalContext) || hasProfessionalConversationContext);
-        
+      
       const forcedEconomicsReply =
         shouldUseProfessionalPricing
           ? buildProfessionalPricingStrategyReply({
@@ -170,16 +170,16 @@ export async function chatRoutes(app: FastifyInstance) {
           : isCupEconomicsIntent(message)
           ? await buildCupEconomicsReply({ message })
           : null;
-
+      
       const safeReply = isCupEconomicsIntent(message)
         ? rawBaristaReply
         : sanitizeForbiddenContent(rawBaristaReply);
-
+      
       const baristaReply =
         forcedEconomicsReply ||
         engineResult?.reply ||
         forcedCommercialReply ||
-        safeReply;
+        safeReply; 
   
       const inferredCoffee =
         inferCoffeeFromText(`${message} ${baristaReply}`) ??

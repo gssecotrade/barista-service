@@ -198,28 +198,31 @@ export function isCompleteEconomicsIntent(message: string): boolean {
 }
 
 export function extractAverageCupPrice(message: string): number | null {
-  const normalized = message.replace(",", ".");
-  const patterns = [
-    /precio medio(?: actual)?(?: es| de)?(?: aproximadamente es| aproximadamente de)?\s*(\d+(?:\.\d+)?)\s*euros?/i,
-    /precio medio(?: actual)?(?: es| de)?(?: aproximadamente es| aproximadamente de)?\s*(\d+(?:\.\d+)?)\s*€/i,
-    /mi café comercial de media\s*(\d+(?:\.\d+)?)/i,
-    /mi precio medio(?: actual)?\s*(?:es|de)?\s*(\d+(?:\.\d+)?)/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = normalized.match(pattern);
-    if (match) {
-      const value = Number(match[1]);
-      if (Number.isFinite(value)) return value;
+    const normalized = message.replace(",", ".").toLowerCase();
+  
+    const patterns = [
+      /precio medio de venta por taza(?: es| de)?\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)/i,
+      /precio medio actual(?: es| de)?\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)/i,
+      /mi precio medio de venta(?: por taza)?(?: es| de)?\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)/i,
+      /vendo(?: de media)? .*? a\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)/i,
+      /mi café comercial de media(?: es)?\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)?/i,
+      /mi precio medio(?: actual)?(?: es| de)?\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)/i,
+      /actualmente mi precio medio de venta por taza es de\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)?/i,
+      /precio medio de venta por taza es de\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)?/i,
+      /precio medio por taza es de\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)?/i,
+      /vendo mis caf(?:e|é)s de media a\s*(\d+(?:\.\d+)?)\s*(?:euros?|€)?/i,
+    ];
+  
+    for (const pattern of patterns) {
+      const match = normalized.match(pattern);
+      if (match) {
+        const value = Number(match[1]);
+        if (Number.isFinite(value)) return value;
+      }
     }
+  
+    return null;
   }
-
-  const fallback = normalized.match(/(\d+(?:\.\d+)?)\s*(?:euros?|€)/i);
-  if (!fallback) return null;
-
-  const value = Number(fallback[1]);
-  return Number.isFinite(value) ? value : null;
-}
 
 async function getProductPricing(handle: CoffeeHandle): Promise<ProductPricingInfo> {
   const response = await fetch(`${SHOPIFY_BASE_URL}/products/${handle}.js`, {
@@ -454,6 +457,12 @@ export function buildProfessionalPricingStrategyReply(params: {
     coffees: ProfessionalMixLineLike[];
   }): string {
     const { currentPricePerCup, coffees } = params;
+
+    console.log("USING buildProfessionalPricingStrategyReply", {
+        currentPricePerCup,
+        coffeesCount: coffees.length,
+        coffees,
+      });
   
     const lines: string[] = [];
   
