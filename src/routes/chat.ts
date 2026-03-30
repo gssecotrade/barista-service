@@ -183,16 +183,16 @@ export async function chatRoutes(app: FastifyInstance) {
         hasPricingContext: !!pricingContext,
       });
 
+      const averageCupPrice = extractAverageCupPrice(message);
+
       const forcedCommercialReply =
         engineResult?.type === "professional_volume"
           ? null
           : buildCommercialQuantityReply(message);
 
-      const averageCupPrice = extractAverageCupPrice(message);
-
       const forcedEconomicsReply = isPricingIntent
         ? await buildProfessionalPricingStrategyReply({
-            currentPricePerCup: extractedPrice ?? 2.5,
+            currentPricePerCup: averageCupPrice ?? 2.5,
             message,
             context: pricingContext
               ? {
@@ -203,32 +203,7 @@ export async function chatRoutes(app: FastifyInstance) {
             coffees:
               pricingContext?.coffees && pricingContext.coffees.length > 0
                 ? pricingContext.coffees
-                : [
-                    {
-                      handle: "catuai",
-                      name: "Catuai",
-                      percentage: 0.42,
-                      targetKg: 20.2,
-                      totalB2B: 436.8,
-                      roundedTargetGrams: 20250,
-                    },
-                    {
-                      handle: "pacamara",
-                      name: "Pacamara",
-                      percentage: 0.33,
-                      targetKg: 15.8,
-                      totalB2B: 585.0,
-                      roundedTargetGrams: 16000,
-                    },
-                    {
-                      handle: "geisha",
-                      name: "Geisha",
-                      percentage: 0.25,
-                      targetKg: 12.1,
-                      totalB2B: 1332.8,
-                      roundedTargetGrams: 12250,
-                    },
-                  ],
+                : [],
           })
         : null;
 
