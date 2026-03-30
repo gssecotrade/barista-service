@@ -138,15 +138,51 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const averageCupPrice = extractAverageCupPrice(message);
 
-      const shouldUseProfessionalPricing =
-        engineResult?.type === "professional_pricing_strategy";
+      const lastProfessionalPlan =
+        isObject((mergedInputState as Record<string, unknown>).lastProfessionalPlan)
+          ? ((mergedInputState as Record<string, unknown>).lastProfessionalPlan as {
+              coffeesPerDay?: number | null;
+              days?: number | null;
+              coffees?: Array<{
+                handle: CoffeeHandle;
+                name: string;
+                percentage: number;
+                targetKg: number;
+                totalB2B?: number;
+                roundedTargetGrams?: number;
+                formatBreakdown?: Array<{
+                  variantId?: number | string | null;
+                  bagSizeGrams: number;
+                  quantity: number;
+                  priceB2B?: number;
+                  priceB2C?: number;
+                }>;
+              }>;
+            })
+          : null;
+
+      const pricingContext =
+        engineResult?.type === "professional_volume"
+          ? {
+              coffeesPerDay: engineResult.meta?.coffeesPerDay ?? null,
+              days: engineResult.meta?.days ?? null,
+              coffees: engineResult.mix?.lines ?? [],
+            }
+          : lastProfessionalPlan
+          ? {
+              coffeesPerDay: lastProfessionalPlan.coffeesPerDay ?? null,
+              days: lastProfessionalPlan.days ?? null,
+              coffees: lastProfessionalPlan.coffees ?? [],
+            }
+          : null;
 
       console.log("PRICING ROUTE CHECK", {
         message,
         isCupEconomics: isCupEconomicsIntent(message),
         engineType: engineResult?.type ?? null,
         averageCupPrice,
-        shouldUseProfessionalPricing,
+        hasLastProfessionalPlan: !!lastProfessionalPlan,
+        hasPricingContext: !!pricingContext,
       });
 
       const forcedCommercialReply =
@@ -154,50 +190,49 @@ export async function chatRoutes(app: FastifyInstance) {
           ? null
           : buildCommercialQuantityReply(message);
 
+      
+
       const forcedEconomicsReply = isPricingIntent
-      ? await buildProfessionalPricingStrategyReply({
-          currentPricePerCup: extractedPrice ?? 2.5,
-          message,
-          context:
-            engineResult?.type === "professional_volume"
+        ? await buildProfessionalPricingStrategyReply({
+            currentPricePerCup: extractedPrice ?? 2.5,
+            message,
+            context: pricingContext
               ? {
-                  coffeesPerDay: engineResult.meta?.coffeesPerDay ?? null,
-                  days: engineResult.meta?.days ?? null,
+                  coffeesPerDay: pricingContext.coffeesPerDay ?? null,
+                  days: pricingContext.days ?? null,
                 }
               : null,
-          coffees:
-            engineResult?.type === "professional_volume" && engineResult.mix?.lines?.length
-              ? engineResult.mix.lines
-              : [
-                  {
-                    handle: "catuai",
-                    name: "Catuai",
-                    percentage: 0.42,
-                    targetKg: 20.2,
-                    totalB2B: 436.8,
-                    roundedTargetGrams: 20250,
-                  },
-                  {
-                    handle: "pacamara",
-                    name: "Pacamara",
-                    percentage: 0.33,
-                    targetKg: 15.8,
-                    totalB2B: 585.0,
-                    roundedTargetGrams: 16000,
-                  },
-                  {
-                    handle: "geisha",
-                    name: "Geisha",
-                    percentage: 0.25,
-                    targetKg: 12.1,
-                    totalB2B: 1332.8,
-                    roundedTargetGrams: 12250,
-                  },
-                ],
-        })
-      : isCupEconomicsIntent(message)
-      ? await buildCupEconomicsReply({ message })
-      : null;
+            coffees:
+              pricingContext?.coffees && pricingContext.coffees.length > 0
+                ? pricingContext.coffees
+                : [
+                    {
+                      handle: "catuai",
+                      name: "Catuai",
+                      percentage: 0.42,
+                      targetKg: 20.2,
+                      totalB2B: 436.8,
+                      roundedTargetGrams: 20250,
+                    },
+                    {
+                      handle: "pacamara",
+                      name: "Pacamara",
+                      percentage: 0.33,
+                      targetKg: 15.8,
+                      totalB2B: 585.0,
+                      roundedTargetGrams: 16000,
+                    },
+                    {
+                      handle: "geisha",
+                      name: "Geisha",
+                      percentage: 0.25,
+                      targetKg: 12.1,
+                      totalB2B: 1332.8,
+                      roundedTargetGrams: 12250,
+                    },
+                  ],
+          })
+        : null;
 
       const safeReply =
         isPricingIntent
@@ -275,6 +310,14 @@ export async function chatRoutes(app: FastifyInstance) {
           updatedContext?.summary ??
           mergedInputState.lastAssistantSummary,
         conversationMode: "continue",
+        lastProfessionalPlan:
+          engineResult?.type === "professional_volume"
+            ? {
+                coffeesPerDay: engineResult.meta?.coffeesPerDay ?? null,
+                days: engineResult.meta?.days ?? null,
+                coffees: engineResult.mix?.lines ?? [],
+              }
+            : (mergedInputState as Record<string, unknown>).lastProfessionalPlan ?? null,
       });
   
       await prisma.baristaMessage.create({
