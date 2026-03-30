@@ -132,8 +132,6 @@ export async function chatRoutes(app: FastifyInstance) {
       const suppressProductCardsForProfessionalVolume =
         engineResult?.type === "professional_volume";
 
-      const extractedPrice = extractAverageCupPrice(message);
-
       const isPricingIntent = isCupEconomicsIntent(message)
 
       const lastProfessionalPlan =
@@ -158,7 +156,7 @@ export async function chatRoutes(app: FastifyInstance) {
               }>;
             })
           : null;
-
+      
       const pricingContext =
         engineResult?.type === "professional_volume"
           ? {
@@ -173,7 +171,7 @@ export async function chatRoutes(app: FastifyInstance) {
               coffees: lastProfessionalPlan.coffees ?? [],
             }
           : null;
-
+      
       console.log("PRICING ROUTE CHECK", {
         message,
         isCupEconomics: isCupEconomicsIntent(message),
@@ -182,14 +180,12 @@ export async function chatRoutes(app: FastifyInstance) {
         hasLastProfessionalPlan: !!lastProfessionalPlan,
         hasPricingContext: !!pricingContext,
       });
-
-      const averageCupPrice = extractAverageCupPrice(message);
-
+      
       const forcedCommercialReply =
         engineResult?.type === "professional_volume"
           ? null
           : buildCommercialQuantityReply(message);
-
+      
       const forcedEconomicsReply = isPricingIntent
         ? await buildProfessionalPricingStrategyReply({
             currentPricePerCup: averageCupPrice ?? 2.5,
@@ -205,7 +201,7 @@ export async function chatRoutes(app: FastifyInstance) {
                 ? pricingContext.coffees
                 : [],
           })
-        : null;
+        : null; 
 
       const safeReply =
         isPricingIntent
