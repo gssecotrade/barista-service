@@ -198,9 +198,18 @@ export async function chatRoutes(app: FastifyInstance) {
                   days: pricingContext.days ?? null,
                 }
               : null,
-            coffees:
+              coffees:
               pricingContext?.coffees && pricingContext.coffees.length > 0
-                ? pricingContext.coffees
+                ? pricingContext.coffees.map((c) => ({
+                    handle: c.handle,
+                    name: c.name,
+                    percentage: c.percentage ?? 0,
+                    targetKg: c.targetKg ?? 0,
+                    totalB2B: c.totalB2B ?? 0,
+                    roundedTargetGrams:
+                      c.roundedTargetGrams ??
+                      Math.round((c.targetKg ?? 0) * 1000),
+                  }))
                 : [],
           })
         : null; 
