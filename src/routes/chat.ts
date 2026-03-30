@@ -154,40 +154,37 @@ export async function chatRoutes(app: FastifyInstance) {
           ? null
           : buildCommercialQuantityReply(message);
 
-      const forcedEconomicsReply =
-        isPrincingIntent
-          ? await buildProfessionalPricingStrategyReply({
-              currentPricePerCup: extractedPrice ?? 2.5
-              coffees: [
-                {
-                  handle: "catuai",
-                  name: "Catuai",
-                  percentage: 0.42,
-                  targetKg: 20.2,
-                  totalB2B: 436.8,
-                  roundedTargetGrams: 20250,
-                },
-                {
-                  handle: "pacamara",
-                  name: "Pacamara",
-                  percentage: 0.33,
-                  targetKg: 15.8,
-                  totalB2B: 585.0,
-                  roundedTargetGrams: 16000,
-                },
-                {
-                  handle: "geisha",
-                  name: "Geisha",
-                  percentage: 0.25,
-                  targetKg: 12.1,
-                  totalB2B: 1332.8,
-                  roundedTargetGrams: 12250,
-                },
-              ],
-            })
-          : isCupEconomicsIntent(message)
-          ? await buildCupEconomicsReply({ message })
-          : null;
+      const forcedEconomicsReply = isPricingIntent
+        ? await buildProfessionalPricingStrategyReply({
+            currentPricePerCup: extractedPrice ?? 2.5,
+            coffees: [
+              {
+                handle: "catuai",
+                name: "Catuai",
+                percentage: 0.42,
+                targetKg: 20.2,
+                totalB2B: 436.8,
+                roundedTargetGrams: 20250,
+              },
+              {
+                handle: "pacamara",
+                name: "Pacamara",
+                percentage: 0.33,
+                targetKg: 15.8,
+                totalB2B: 585.0,
+                roundedTargetGrams: 16000,
+              },
+              {
+                handle: "geisha",
+                name: "Geisha",
+                percentage: 0.25,
+                targetKg: 12.1,
+                totalB2B: 1332.8,
+                roundedTargetGrams: 12250,
+              },
+            ],
+          })
+        : null;
 
       const safeReply =
         isPricingIntent
