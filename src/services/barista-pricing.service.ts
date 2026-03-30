@@ -44,6 +44,13 @@ type ProfessionalEngineResultLike = {
   };
 };
 
+type SalesVolumeContext = {
+  cupsPerDay: number | null;
+  cupsPerWeek: number | null;
+  cupsPerMonth: number | null;
+  normalizedMonthlyCups: number | null;
+};
+
 type ShopifyProductJson = {
   title?: string;
   handle?: string;
@@ -139,19 +146,30 @@ export async function buildCupEconomicsReply(params: {
     );
 
     lines.push(`${product.name}:`);
+    lines.push(`- formato de referencia: ${formatBagSize(preferredVariant.bagSizeGrams)}`);
+    lines.push(`- coste por taza: ${formatEuro(costPerCup)}`);
+
+    if (mode === "complete") {
+      const suggestedPrice = buildSuggestedCupPrice({
+        handle: product.handle,
+        costPerCup,
+        averageCupPrice,
+      });
+
+      const marginPerCup = roundMoney(suggestedPrice - costPerCup);
+
+      lines.push(`- precio recomendado: ${formatEuro(suggestedPrice)}`);
+      lines.push(`- margen por taza: ${formatEuro(marginPerCup)}`);
+      lines.push(`- rol en carta: ${describeRole(product.handle)}`);
+    }
+
+    lines.push("");
+  }
+
+  if (mode === "simple") {
     lines.push(
-        `${product.name}:`,
-        `- precio actual: ${formatEuro(currentPricePerCup)}`,
-        `- precio recomendado: ${formatEuro(suggestedPrice)}`,
-        `- cote por taza: ${formatEuro(costPerCup)}`,
-        `- mejora por taza: ${formatEuro(incrementalPerCup)}`,
-        upsideMonthly !== null && incrementalPerCup > 0.2
-          ? `- impacto estimado mensual: ${formatEuro(upsideMonthly)}`
-          : null,
-        `- rol en carta: ${describeRole(product.handle)}`,
-        `- argumento: ${buildSalesArgument(product.handle)}`,
-        ""
-      );
+      "Si quieres, te doy también una propuesta completa con precio recomendado y margen por taza para cada variedad."
+    );
   }
 
   return lines.join("\n").trim();
@@ -216,6 +234,64 @@ export function extractAverageCupPrice(message: string): number | null {
   }
 
   return null;
+}
+
+export function extractSalesVolumeContext(message: string): SalesVolumeContext {
+  const text = message.toLowerCase().replace(/\s+/g, " ").trim();
+
+  const perDayPatterns = [
+    /(\d+)\s*caf(?:e|é)s?\s*(?:al|por)?\s*d[ií]a/,
+    /(\d+)\s*tazas?\s*(?:al|por)?\s*d[ií]a/,
+    /vendo\s*(\d+)\s*caf(?:e|é)s?\s*(?:al|por)?\s*d[ií]a/,
+    /sirvo\s*(\d+)\s*caf(?:e|é)s?\s*(?:al|por)?\s*d[ií]a/,
+    /sirvo\s*(\d+)\s*tazas?\s*(?:al|por)?\s*d[ií]a/,
+    /vendo\s*(\d+)\s*caf(?:e|é)s?\s*diarios?/,
+    /sirvo\s*(\d+)\s*caf(?:e|é)s?\s*diarios?/,
+    /(\d+)\s*caf(?:e|é)s?\s*diarios?/,
+  ];
+
+  const perWeekPatterns = [
+    /(\d+)\s*caf(?:e|é)s?\s*(?:a la|por)?\s*semana/,
+    /(\d+)\s*tazas?\s*(?:a la|por)?\s*semana/,
+    /vendo\s*(\d+)\s*caf(?:e|é)s?\s*(?:a la|por)?\s*semana/,
+    /sirvo\s*(\d+)\s*caf(?:e|é)s?\s*(?:a la|por)?\s*semana/,
+  ];
+
+  const perMonthPatterns = [
+    /(\d+)\s*caf(?:e|é)s?\s*(?:al|por)?\s*mes/,
+    /(\d+)\s*tazas?\s*(?:al|por)?\s*mes/,
+    /vendo\s*(\d+)\s*caf(?:e|é)s?\s*(?:al|por)?\s*mes/,
+    /sirvo\s*(\d+)\s*caf(?:e|é)s?\s*(?:al|por)?\s*mes/,
+  ];
+
+  const weekdayPatterns = [
+    /(\d+)\s*caf(?:e|é)s?\s*(?:de lunes a viernes|entre semana)/,
+    /(\d+)\s*tazas?\s*(?:de lunes a viernes|entre semana)/,
+  ];
+
+  const cupsPerDay = matchFirstNumber(text, perDayPatterns);
+  const cupsPerWeek = matchFirstNumber(text, perWeekPatterns);
+  const cupsPerMonth = matchFirstNumber(text, perMonthPatterns);
+  const weekdayDaily = matchFirstNumber(text, weekdayPatterns);
+
+  let normalizedMonthlyCups: number | null = null;
+
+  if (cupsPerMonth !== null) {
+    normalizedMonthlyCups = cupsPerMonth;
+  } else if (cupsPerWeek !== null) {
+    normalizedMonthlyCups = Math.round(cupsPerWeek * 4.33);
+  } else if (weekdayDaily !== null) {
+    normalizedMonthlyCups = weekdayDaily * 22;
+  } else if (cupsPerDay !== null) {
+    normalizedMonthlyCups = cupsPerDay * 30;
+  }
+
+  return {
+    cupsPerDay,
+    cupsPerWeek,
+    cupsPerMonth,
+    normalizedMonthlyCups,
+  };
 }
 
 async function getProductPricing(handle: CoffeeHandle): Promise<ProductPricingInfo> {
@@ -362,6 +438,18 @@ function extractCoffeeHandlesFromMessage(message: string): CoffeeHandle[] {
   return Array.from(new Set(handles));
 }
 
+function matchFirstNumber(text: string, patterns: RegExp[]): number | null {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const value = Number(match[1]);
+      if (Number.isFinite(value)) return value;
+    }
+  }
+
+  return null;
+}
+
 function formatBagSize(value: number): string {
   if (value >= 1000 && value % 1000 === 0) {
     return `${value / 1000} kg`;
@@ -406,7 +494,7 @@ export function buildProfessionalEconomicsReply(
 
   for (const line of mix.lines) {
     const gramsPerCup = inferGramsPerCup(line.handle);
-    const costPerCup = computeLiveShopifyCostPerCup(line.handle);
+    const costPerCup = computeCostPerCupFromMixLine(line, gramsPerCup);
 
     const suggestedPrice = buildSuggestedCupPrice({
       handle: line.handle,
@@ -423,9 +511,8 @@ export function buildProfessionalEconomicsReply(
     }
 
     lines.push(`${line.name}:`);
-    lines.push(`- gramos recomendados por taza: ${gramsPerCup} g`);
-    lines.push(`- coste real por taza: ${formatEuro(costPerCup)}`);
-    lines.push(`- precio sugerido por taza: ${formatEuro(suggestedPrice)}`);
+    lines.push(`- coste por taza: ${formatEuro(costPerCup)}`);
+    lines.push(`- precio sugerido: ${formatEuro(suggestedPrice)}`);
     lines.push(`- margen por taza: ${formatEuro(marginPerCup)}`);
     if (monthlyMargin !== null) {
       lines.push(`- margen estimado del periodo: ${formatEuro(monthlyMargin)}`);
@@ -443,110 +530,153 @@ export function buildProfessionalEconomicsReply(
 }
 
 export async function buildProfessionalPricingStrategyReply(params: {
-    currentPricePerCup: number;
-    coffees: ProfessionalMixLineLike[];
-  }): Promise<string> {
-    const { currentPricePerCup, coffees } = params;
-  
-    console.log("USING buildProfessionalPricingStrategyReply", {
-      currentPricePerCup,
-      coffeesCount: coffees.length,
-      coffees,
-    });
-  
-    const uniqueHandles = Array.from(
-      new Set(
-        (coffees.length
-          ? coffees
-          : [
-              { handle: "catuai" as CoffeeHandle, percentage: 0.42, targetKg: 20.2 },
-              { handle: "pacamara" as CoffeeHandle, percentage: 0.33, targetKg: 15.8 },
-              { handle: "geisha" as CoffeeHandle, percentage: 0.25, targetKg: 12.1 },
-            ]).map((coffee) => coffee.handle)
-      )
-    ) as CoffeeHandle[];
-  
-    const products = await Promise.all(
-      uniqueHandles.map((handle) => getProductPricing(handle))
+  currentPricePerCup: number;
+  coffees: ProfessionalMixLineLike[];
+  message?: string;
+}): Promise<string> {
+  const { currentPricePerCup, coffees, message } = params;
+
+  console.log("USING buildProfessionalPricingStrategyReply", {
+    currentPricePerCup,
+    coffeesCount: coffees.length,
+    coffees,
+    message,
+  });
+
+  const uniqueHandles = Array.from(
+    new Set(
+      (coffees.length
+        ? coffees
+        : [
+            { handle: "catuai" as CoffeeHandle, percentage: 0.42, targetKg: 20.2 },
+            { handle: "pacamara" as CoffeeHandle, percentage: 0.33, targetKg: 15.8 },
+            { handle: "geisha" as CoffeeHandle, percentage: 0.25, targetKg: 12.1 },
+          ]).map((coffee) => coffee.handle)
+    )
+  ) as CoffeeHandle[];
+
+  const products = await Promise.all(
+    uniqueHandles.map((handle) => getProductPricing(handle))
+  );
+
+  const salesVolume = extractSalesVolumeContext(message ?? "");
+  const totalCupsPeriod = salesVolume.normalizedMonthlyCups ?? 900;
+
+  const lines: string[] = [];
+
+  lines.push(
+    `Con tu precio actual de ${formatEuro(
+      currentPricePerCup
+    )} por taza, tienes margen para mejorar rentabilidad sin afectar rotación.`,
+    salesVolume.normalizedMonthlyCups !== null
+      ? `He tomado como referencia un volumen aproximado de ${salesVolume.normalizedMonthlyCups} cafés al mes.`
+      : `Como no has indicado un volumen exacto, tomo una referencia estándar de 900 cafés al mes.`,
+    "",
+    "Propuesta por variedad:",
+    ""
+  );
+
+  for (const product of products) {
+    const preferredVariant = pickPreferredVariant(product.handle, product.variants);
+    if (!preferredVariant) continue;
+
+    const gramsPerCup = inferGramsPerCup(product.handle);
+    const costPerCup = roundMoney(
+      (preferredVariant.priceB2B / preferredVariant.bagSizeGrams) * gramsPerCup
     );
-  
-    const totalCupsPeriod = 30 * 30; // base neutra comercial: 30 cafés/día x 30 días
-    const lines: string[] = [];
-  
+
+    let suggestedPrice = currentPricePerCup;
+
+    if (product.handle === "catuai") {
+      suggestedPrice = Math.max(currentPricePerCup + 0.2, 2.2);
+    } else if (product.handle === "pacamara") {
+      suggestedPrice = Math.max(currentPricePerCup + 0.5, 2.9);
+    } else if (product.handle === "geisha") {
+      suggestedPrice = Math.max(currentPricePerCup + 1.0, 3.8);
+    }
+
+    suggestedPrice = roundToTenCents(suggestedPrice);
+
+    const incrementalPerCup = roundMoney(suggestedPrice - currentPricePerCup);
+    const mixLine = coffees.find((coffee) => coffee.handle === product.handle);
+    const percentage =
+      typeof mixLine?.percentage === "number" ? mixLine.percentage : null;
+
+    let upsideMonthly: number | null = null;
+    if (percentage !== null) {
+      const cupsForThisVariety = totalCupsPeriod * percentage;
+      upsideMonthly = roundMoney(cupsForThisVariety * incrementalPerCup);
+    }
+
     lines.push(
-      `Partiendo de tu precio medio actual de ${formatEuro(
-        currentPricePerCup
-      )} por taza, la oportunidad no está en vender más barato, sino en capturar más valor por taza sin penalizar la rotación.`,
-      "",
-      "Propuesta por variedad:",
+      `${product.name}:`,
+      `- coste por taza: ${formatEuro(costPerCup)}`,
+      `- precio actual: ${formatEuro(currentPricePerCup)}`,
+      `- precio recomendado: ${formatEuro(suggestedPrice)}`,
+      `- mejora por taza: ${formatEuro(incrementalPerCup)}`,
+      incrementalPerCup > 0.2 && upsideMonthly !== null
+        ? `- impacto mensual estimado: ${formatEuro(upsideMonthly)}`
+        : null,
+      `- rol en carta: ${describeRole(product.handle)}`,
+      `- argumento: ${buildSalesArgument(product.handle)}`,
       ""
     );
-  
-    for (const product of products) {
-      const preferredVariant = pickPreferredVariant(product.handle, product.variants);
-      if (!preferredVariant) continue;
-  
-      const gramsPerCup = inferGramsPerCup(product.handle);
-      const costPerGram = preferredVariant.priceB2B / preferredVariant.bagSizeGrams;
-      const costPerCup = roundMoney(costPerGram * gramsPerCup);
-  
-      let suggestedPrice = currentPricePerCup;
-  
-      if (product.handle === "catuai") {
-        suggestedPrice = Math.max(currentPricePerCup + 0.2, 2.2);
-      } else if (product.handle === "pacamara") {
-        suggestedPrice = Math.max(currentPricePerCup + 0.5, 2.9);
-      } else if (product.handle === "geisha") {
-        suggestedPrice = Math.max(currentPricePerCup + 1.0, 3.8);
-      }
-  
-      suggestedPrice = roundToTenCents(suggestedPrice);
-  
-      const currentMarginPerCup = roundMoney(currentPricePerCup - costPerCup);
-      const recommendedMarginPerCup = roundMoney(suggestedPrice - costPerCup);
-      const incrementalPerCup = roundMoney(suggestedPrice - currentPricePerCup);
-  
-      const mixLine = coffees.find((coffee) => coffee.handle === product.handle);
-      const percentage = typeof mixLine?.percentage === "number" ? mixLine.percentage : null;
-  
-      let upsideMonthly: number | null = null;
-      if (percentage !== null) {
-        const cupsForThisVariety = totalCupsPeriod * percentage;
-        upsideMonthly = roundMoney(cupsForThisVariety * incrementalPerCup);
-      }
-  
-      lines.push(
-        `${product.name}:`,
-        `- formato de referencia: ${formatBagSize(preferredVariant.bagSizeGrams)}`,
-        `- gramos recomendados por taza: ${gramsPerCup} g`,
-        `- coste real por taza: ${formatEuro(costPerCup)}`,
-        `- precio actual estimado: ${formatEuro(currentPricePerCup)}`,
-        `- precio recomendado por taza: ${formatEuro(suggestedPrice)}`,
-        `- margen actual por taza: ${formatEuro(currentMarginPerCup)}`,
-        `- margen recomendado por taza: ${formatEuro(recommendedMarginPerCup)}`,
-        `- mejora por taza: ${formatEuro(incrementalPerCup)}`,
-        upsideMonthly !== null
-          ? `- potencial mensual estimado: ${formatEuro(upsideMonthly)}`
-          : null,
-        `- rol en carta: ${describeRole(product.handle)}`,
-        `- argumento de venta: ${buildSalesArgument(product.handle)}`,
-        ""
-      );
-    }
-  
-    lines.push(
-      "Conclusión:",
-      "Hoy ya tienes margen, pero estás infra monetizando parte del valor que puede aportar una carta de café de especialidad bien estructurada.",
-      "Con una arquitectura correcta puedes aumentar margen, elevar percepción de calidad y sostener mejor la fidelización del cliente."
-    );
-  
-    return lines.filter(Boolean).join("\n").trim();
   }
 
-function computeLiveShopifyCostPerCup(handle: CoffeeHandle): number {
-  // Esta función no se usa en runtime directamente porque getProductPricing es async.
-  // Se deja para compatibilidad estructural.
-  return 0;
+  lines.push(
+    "Conclusión:",
+    "El café de especialidad puede costarte más por kilo, pero bien planteado te permite vender mejor cada taza, elevar margen y reforzar percepción de calidad.",
+    "Estrategia recomendada: mantener Catuai como base de rotación, usar Pacamara para sobremesa y posicionar Geisha como propuesta premium."
+  );
+
+  return lines.filter(Boolean).join("\n").trim();
+}
+
+function computeCostPerCupFromMixLine(
+  line: ProfessionalMixLineLike,
+  gramsPerCup: number
+): number {
+  const costPerGram = computeWeightedB2BCostPerGram(line);
+  return roundMoney(costPerGram * gramsPerCup);
+}
+
+function computeWeightedB2BCostPerGram(coffee: {
+  roundedTargetGrams?: number;
+  totalB2B?: number;
+  formatBreakdown?: Array<{
+    bagSizeGrams: number;
+    quantity: number;
+    priceB2B?: number;
+    priceB2C?: number;
+  }>;
+}): number {
+  const breakdown = coffee.formatBreakdown ?? [];
+
+  if (breakdown.length > 0) {
+    const totalCostB2B = breakdown.reduce((sum, item) => {
+      const itemPriceB2B =
+        typeof item.priceB2B === "number"
+          ? item.priceB2B
+          : typeof item.priceB2C === "number"
+          ? item.priceB2C * B2B_DISCOUNT_FACTOR
+          : 0;
+
+      return sum + itemPriceB2B * item.quantity;
+    }, 0);
+
+    const totalGrams = breakdown.reduce((sum, item) => {
+      return sum + item.bagSizeGrams * item.quantity;
+    }, 0);
+
+    return totalGrams > 0 ? totalCostB2B / totalGrams : 0;
+  }
+
+  const fallbackGrams =
+    typeof coffee.roundedTargetGrams === "number" ? coffee.roundedTargetGrams : 0;
+
+  return fallbackGrams > 0 && typeof coffee.totalB2B === "number"
+    ? coffee.totalB2B / fallbackGrams
+    : 0;
 }
 
 function inferGramsPerCup(handle: CoffeeHandle): number {
@@ -558,16 +688,16 @@ function describeRole(handle: CoffeeHandle): string {
 }
 
 function buildSalesArgument(handle: CoffeeHandle): string {
-    if (handle === "catuai") {
-      return "base house de rotación, equilibrado, rentable y fácil de defender en volumen";
-    }
-  
-    if (handle === "pacamara") {
-      return "ideal para sobremesa y momentos gastronómicos, con más valor percibido y mejor ticket medio";
-    }
-  
-    return "referencia premium para diferenciar la carta y justificar un precio superior por experiencia";
+  if (handle === "catuai") {
+    return "base house de rotación, equilibrado, rentable y fácil de defender en volumen";
   }
+
+  if (handle === "pacamara") {
+    return "ideal para sobremesa y momentos gastronómicos, con más valor percibido y mejor ticket medio";
+  }
+
+  return "referencia premium para diferenciar la carta y justificar un precio superior por experiencia";
+}
 
 function extractAverageCupPriceFromEngineContext(
   _engineResult: ProfessionalEngineResultLike
