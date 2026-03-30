@@ -10,6 +10,7 @@ import {
 } from "../services/barista-state.service";
 import {
   buildCupEconomicsReply,
+  buildProfessionalEconomicsReply,
   buildProfessionalPricingStrategyReply,
   extractAverageCupPrice,
   isCupEconomicsIntent,
@@ -131,6 +132,10 @@ export async function chatRoutes(app: FastifyInstance) {
       const suppressProductCardsForProfessionalVolume =
         engineResult?.type === "professional_volume";
 
+      const extractedPrice = extractAverageCupPrice(message);
+
+      const isPricingIntent = isCupEconomicsIntent(message);
+
       const averageCupPrice = extractAverageCupPrice(message);
 
       const shouldUseProfessionalPricing =
@@ -150,9 +155,9 @@ export async function chatRoutes(app: FastifyInstance) {
           : buildCommercialQuantityReply(message);
 
       const forcedEconomicsReply =
-        shouldUseProfessionalPricing
+        isPrincingIntent
           ? await buildProfessionalPricingStrategyReply({
-              currentPricePerCup: averageCupPrice ?? 2.5,
+              currentPricePerCup: extractedPrice ?? 2.5
               coffees: [
                 {
                   handle: "catuai",
@@ -185,7 +190,7 @@ export async function chatRoutes(app: FastifyInstance) {
           : null;
 
       const safeReply =
-        shouldUseProfessionalPricing || isCupEconomicsIntent(message)
+        isPricingIntent
           ? rawBaristaReply
           : sanitizeForbiddenContent(rawBaristaReply);
 

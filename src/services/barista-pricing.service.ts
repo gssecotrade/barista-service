@@ -459,81 +459,105 @@ export function buildProfessionalEconomicsReply(
 }
 
 export async function buildProfessionalPricingStrategyReply(params: {
-  currentPricePerCup: number;
-  coffees: ProfessionalMixLineLike[];
-}): Promise<string> {
-  const { currentPricePerCup, coffees } = params;
-
-  console.log("USING buildProfessionalPricingStrategyReply", {
-    currentPricePerCup,
-    coffeesCount: coffees.length,
-    coffees,
-  });
-
-  const uniqueHandles = Array.from(
-    new Set((coffees.length ? coffees : [
-      { handle: "catuai" },
-      { handle: "pacamara" },
-      { handle: "geisha" },
-    ]).map((coffee) => coffee.handle))
-  ) as CoffeeHandle[];
-
-  const products = await Promise.all(uniqueHandles.map((handle) => getProductPricing(handle)));
-
-  const lines: string[] = [];
-
-  lines.push(
-    `Partiendo de tu precio medio actual de ${formatEuro(
-      currentPricePerCup
-    )} por taza, la clave no es comprar café más barato, sino elevar valor percibido y margen sin penalizar la rotación.`,
-    "",
-    "Propuesta por variedad:",
-    ""
-  );
-
-  for (const product of products) {
-    const preferredVariant = pickPreferredVariant(product.handle, product.variants);
-    if (!preferredVariant) continue;
-
-    const gramsPerCup = inferGramsPerCup(product.handle);
-    const costPerGram = preferredVariant.priceB2B / preferredVariant.bagSizeGrams;
-    const costPerCup = roundMoney(costPerGram * gramsPerCup);
-
-    let suggestedPrice = currentPricePerCup;
-
-    if (product.handle === "catuai") {
-      suggestedPrice = Math.max(currentPricePerCup + 0.2, 2.2);
-    } else if (product.handle === "pacamara") {
-      suggestedPrice = Math.max(currentPricePerCup + 0.5, 2.9);
-    } else if (product.handle === "geisha") {
-      suggestedPrice = Math.max(currentPricePerCup + 1.0, 3.8);
-    }
-
-    suggestedPrice = roundToTenCents(suggestedPrice);
-
-    const marginPerCup = roundMoney(suggestedPrice - costPerCup);
-
+    currentPricePerCup: number;
+    coffees: ProfessionalMixLineLike[];
+  }): Promise<string> {
+    const { currentPricePerCup, coffees } = params;
+  
+    console.log("USING buildProfessionalPricingStrategyReply", {
+      currentPricePerCup,
+      coffeesCount: coffees.length,
+      coffees,
+    });
+  
+    const uniqueHandles = Array.from(
+      new Set(
+        (coffees.length
+          ? coffees
+          : [
+              { handle: "catuai" as CoffeeHandle, percentage: 0.42, targetKg: 20.2 },
+              { handle: "pacamara" as CoffeeHandle, percentage: 0.33, targetKg: 15.8 },
+              { handle: "geisha" as CoffeeHandle, percentage: 0.25, targetKg: 12.1 },
+            ]).map((coffee) => coffee.handle)
+      )
+    ) as CoffeeHandle[];
+  
+    const products = await Promise.all(
+      uniqueHandles.map((handle) => getProductPricing(handle))
+    );
+  
+    const totalCupsPeriod = 30 * 30; // base neutra comercial: 30 cafés/día x 30 días
+    const lines: string[] = [];
+  
     lines.push(
-      `${product.name}:`,
-      `- formato de referencia: ${formatBagSize(preferredVariant.bagSizeGrams)}`,
-      `- gramos recomendados por taza: ${gramsPerCup} g`,
-      `- coste real por taza: ${formatEuro(costPerCup)}`,
-      `- precio recomendado por taza: ${formatEuro(suggestedPrice)}`,
-      `- margen por taza: ${formatEuro(marginPerCup)}`,
-      `- rol en carta: ${describeRole(product.handle)}`,
+      `Partiendo de tu precio medio actual de ${formatEuro(
+        currentPricePerCup
+      )} por taza, la oportunidad no está en vender más barato, sino en capturar más valor por taza sin penalizar la rotación.`,
+      "",
+      "Propuesta por variedad:",
       ""
     );
+  
+    for (const product of products) {
+      const preferredVariant = pickPreferredVariant(product.handle, product.variants);
+      if (!preferredVariant) continue;
+  
+      const gramsPerCup = inferGramsPerCup(product.handle);
+      const costPerGram = preferredVariant.priceB2B / preferredVariant.bagSizeGrams;
+      const costPerCup = roundMoney(costPerGram * gramsPerCup);
+  
+      let suggestedPrice = currentPricePerCup;
+  
+      if (product.handle === "catuai") {
+        suggestedPrice = Math.max(currentPricePerCup + 0.2, 2.2);
+      } else if (product.handle === "pacamara") {
+        suggestedPrice = Math.max(currentPricePerCup + 0.5, 2.9);
+      } else if (product.handle === "geisha") {
+        suggestedPrice = Math.max(currentPricePerCup + 1.0, 3.8);
+      }
+  
+      suggestedPrice = roundToTenCents(suggestedPrice);
+  
+      const currentMarginPerCup = roundMoney(currentPricePerCup - costPerCup);
+      const recommendedMarginPerCup = roundMoney(suggestedPrice - costPerCup);
+      const incrementalPerCup = roundMoney(suggestedPrice - currentPricePerCup);
+  
+      const mixLine = coffees.find((coffee) => coffee.handle === product.handle);
+      const percentage = typeof mixLine?.percentage === "number" ? mixLine.percentage : null;
+  
+      let upsideMonthly: number | null = null;
+      if (percentage !== null) {
+        const cupsForThisVariety = totalCupsPeriod * percentage;
+        upsideMonthly = roundMoney(cupsForThisVariety * incrementalPerCup);
+      }
+  
+      lines.push(
+        `${product.name}:`,
+        `- formato de referencia: ${formatBagSize(preferredVariant.bagSizeGrams)}`,
+        `- gramos recomendados por taza: ${gramsPerCup} g`,
+        `- coste real por taza: ${formatEuro(costPerCup)}`,
+        `- precio actual estimado: ${formatEuro(currentPricePerCup)}`,
+        `- precio recomendado por taza: ${formatEuro(suggestedPrice)}`,
+        `- margen actual por taza: ${formatEuro(currentMarginPerCup)}`,
+        `- margen recomendado por taza: ${formatEuro(recommendedMarginPerCup)}`,
+        `- mejora por taza: ${formatEuro(incrementalPerCup)}`,
+        upsideMonthly !== null
+          ? `- potencial mensual estimado: ${formatEuro(upsideMonthly)}`
+          : null,
+        `- rol en carta: ${describeRole(product.handle)}`,
+        `- argumento de venta: ${buildSalesArgument(product.handle)}`,
+        ""
+      );
+    }
+  
+    lines.push(
+      "Conclusión:",
+      "Hoy ya tienes margen, pero estás infra monetizando parte del valor que puede aportar una carta de café de especialidad bien estructurada.",
+      "Con una arquitectura correcta puedes aumentar margen, elevar percepción de calidad y sostener mejor la fidelización del cliente."
+    );
+  
+    return lines.filter(Boolean).join("\n").trim();
   }
-
-  lines.push(
-    "Conclusión:",
-    "El café de especialidad puede costarte más por kilo, pero también te permite vender mejor cada taza, aumentar margen, reforzar percepción de calidad y fidelizar más.",
-    "",
-    "Estrategia recomendada: mantener Catuai como base de rotación, usar Pacamara para sobremesa y posicionar Geisha como propuesta premium."
-  );
-
-  return lines.join("\n").trim();
-}
 
 function computeLiveShopifyCostPerCup(handle: CoffeeHandle): number {
   // Esta función no se usa en runtime directamente porque getProductPricing es async.
@@ -548,6 +572,18 @@ function inferGramsPerCup(handle: CoffeeHandle): number {
 function describeRole(handle: CoffeeHandle): string {
   return coffeeBusinessRules[handle].role;
 }
+
+function buildSalesArgument(handle: CoffeeHandle): string {
+    if (handle === "catuai") {
+      return "base house de rotación, equilibrado, rentable y fácil de defender en volumen";
+    }
+  
+    if (handle === "pacamara") {
+      return "ideal para sobremesa y momentos gastronómicos, con más valor percibido y mejor ticket medio";
+    }
+  
+    return "referencia premium para diferenciar la carta y justificar un precio superior por experiencia";
+  }
 
 function extractAverageCupPriceFromEngineContext(
   _engineResult: ProfessionalEngineResultLike
