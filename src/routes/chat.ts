@@ -134,6 +134,8 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const isPricingIntent = isCupEconomicsIntent(message)
 
+      const averageCupPrice = extractAverageCupPrice(message); 
+
       const lastProfessionalPlan =
         isObject((mergedInputState as Record<string, unknown>).lastProfessionalPlan)
           ? ((mergedInputState as Record<string, unknown>).lastProfessionalPlan as {
