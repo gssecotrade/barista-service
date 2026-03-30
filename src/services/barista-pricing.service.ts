@@ -140,34 +140,18 @@ export async function buildCupEconomicsReply(params: {
 
     lines.push(`${product.name}:`);
     lines.push(
-      `- formato de referencia: ${formatBagSize(preferredVariant.bagSizeGrams)}`
-    );
-    lines.push(
-      `- gramos recomendados por taza: ${product.recommendedGramsPerCup} g`
-    );
-    lines.push(`- coste real por taza: ${formatEuro(costPerCup)}`);
-
-    if (mode === "complete") {
-      const suggestedCupPrice = buildSuggestedCupPrice({
-        handle: product.handle,
-        costPerCup,
-        averageCupPrice,
-      });
-
-      const marginPerCup = roundMoney(suggestedCupPrice - costPerCup);
-
-      lines.push(`- precio sugerido por taza: ${formatEuro(suggestedCupPrice)}`);
-      lines.push(`- margen por taza: ${formatEuro(marginPerCup)}`);
-      lines.push(`- rol en carta: ${coffeeBusinessRules[product.handle].role}`);
-    }
-
-    lines.push("");
-  }
-
-  if (mode === "simple") {
-    lines.push(
-      "Si quieres, te doy también una propuesta completa con precio sugerido y margen por taza para cada variedad."
-    );
+        `${product.name}:`,
+        `- precio actual: ${formatEuro(currentPricePerCup)}`,
+        `- precio recomendado: ${formatEuro(suggestedPrice)}`,
+        `- cote por taza: ${formatEuro(costPerCup)}`,
+        `- mejora por taza: ${formatEuro(incrementalPerCup)}`,
+        upsideMonthly !== null && incrementalPerCup > 0.2
+          ? `- impacto estimado mensual: ${formatEuro(upsideMonthly)}`
+          : null,
+        `- rol en carta: ${describeRole(product.handle)}`,
+        `- argumento: ${buildSalesArgument(product.handle)}`,
+        ""
+      );
   }
 
   return lines.join("\n").trim();
