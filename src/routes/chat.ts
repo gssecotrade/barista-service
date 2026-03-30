@@ -188,7 +188,7 @@ export async function chatRoutes(app: FastifyInstance) {
           ? null
           : buildCommercialQuantityReply(message);
 
-      
+      const averageCupPrice = extractAverageCupPrice(message);
 
       const forcedEconomicsReply = isPricingIntent
         ? await buildProfessionalPricingStrategyReply({
