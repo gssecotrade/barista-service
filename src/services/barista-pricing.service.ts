@@ -582,14 +582,20 @@ export async function buildProfessionalPricingStrategyReply(params: {
     lines.push(
         `Con tu precio actual de ${formatEuro(
           currentPricePerCup
-        )} por taza, tienes margen para mejorar rentabilidad sin afectar la rotación.`,
-        totalCupsPeriod !== null
-          ? `Tomando como base el volumen ya analizado de ${totalCupsPeriod} cafés en el periodo.`
-          : "No has indicado un volumen exacto en este mensaje, así que no se estimará impacto mensual.",
-        "",
-        "Propuesta por variedad:",
-        ""
+        )} por taza, tienes margen para mejorar rentabilidad sin afectar la rotación.`
       );
+      
+      if (totalCupsPeriod !== null) {
+        lines.push(
+          `Tomando como base el volumen ya analizado de ${totalCupsPeriod} cafés en el periodo.`
+        );
+      } else {
+        lines.push(
+          "No has indicado un volumen exacto en este mensaje, así que no se estimará impacto mensual."
+        );
+      }
+      
+      lines.push("");
   
     if (typeof effectiveCoffeesPerDay === "number" && effectiveCoffeesPerDay > 0) {
       lines.push(
@@ -654,19 +660,19 @@ export async function buildProfessionalPricingStrategyReply(params: {
       const cupsForThisVariety = roundMoney(totalCupsPeriod * percentage);
       const monthlyImprovement = roundMoney(cupsForThisVariety * improvementPerCup);
   
-      lines.push(
-        `${product.name}:`,
-        `- coste por taza: ${formatEuro(costPerCup)}`,
-        `- precio actual: ${formatEuro(currentPricePerCup)}`,
-        `- precio recomendado: ${formatEuro(suggestedPrice)}`,
-        `- mejora por taza: ${formatEuro(incrementalPerCup)}`,
-        upsideMonthly !== null
-          ? `- impacto mensual estimado: ${formatEuro(upsideMonthly)}`
-          : null,
-        `- rol en carta: ${describeRole(product.handle)}`,
-        `- argumento: ${buildSalesArgument(product.handle)}`,
-        ""
-      );
+      lines.push(`${product.name}:`);
+      lines.push(`- coste por taza: ${formatEuro(costPerCup)}`);
+      lines.push(`- precio actual: ${formatEuro(currentPricePerCup)}`);
+      lines.push(`- precio recomendado: ${formatEuro(suggestedPrice)}`);
+      lines.push(`- mejora por taza: ${formatEuro(incrementalPerCup)}`);
+      
+      if (upsideMonthly !== null) {
+        lines.push(`- impacto mensual estimado: ${formatEuro(upsideMonthly)}`);
+      }
+      
+      lines.push(`- rol en carta: ${describeRole(product.handle)}`);
+      lines.push(`- argumento: ${buildSalesArgument(product.handle)}`);
+      lines.push("");
     }
   
     lines.push(
