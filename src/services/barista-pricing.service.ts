@@ -180,9 +180,6 @@ export async function buildCupEconomicsReply(params: {
 export function isCupEconomicsIntent(message: string): boolean {
   const text = message.toLowerCase();
 
-  export function isCupEconomicsIntent(message: string): boolean {
-  const text = message.toLowerCase().replace(/\s+/g, " ").trim();
-
   return (
     text.includes("margen por taza") ||
     text.includes("coste por taza") ||
