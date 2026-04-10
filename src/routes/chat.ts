@@ -17,6 +17,28 @@ import {
 } from "../services/barista-pricing.service";
 import { runBaristaDecisionEngine } from "../services/barista-decision-engine.service";
 
+function shouldMentionClubArte(userMessage: string): boolean {
+  const msg = userMessage.toLowerCase();
+
+  const purchaseSignals = [
+    "comprar",
+    "pedido",
+    "pack",
+    "café",
+    "cafe",
+    "recomendar",
+    "cuál",
+    "cual",
+    "precio",
+    "envío",
+    "geisha",
+    "catuai",
+    "pacamara"
+  ];
+
+  return purchaseSignals.some(signal => msg.includes(signal));
+}
+
 const chatBodySchema = z.object({
   userId: z.string().min(1),
   message: z.string().min(1),
@@ -198,21 +220,12 @@ export async function chatRoutes(app: FastifyInstance) {
                   days: pricingContext.days ?? null,
                 }
               : null,
-              coffees:
+            coffees:
               pricingContext?.coffees && pricingContext.coffees.length > 0
-                ? pricingContext.coffees.map((c) => ({
-                    handle: c.handle,
-                    name: c.name,
-                    percentage: c.percentage ?? 0,
-                    targetKg: c.targetKg ?? 0,
-                    totalB2B: c.totalB2B ?? 0,
-                    roundedTargetGrams:
-                      c.roundedTargetGrams ??
-                      Math.round((c.targetKg ?? 0) * 1000),
-                  }))
+                ? pricingContext.coffees
                 : [],
           })
-        : null; 
+        : null;
 
       const safeReply =
         isPricingIntent
@@ -224,6 +237,15 @@ export async function chatRoutes(app: FastifyInstance) {
         engineResult?.reply ||
         forcedCommercialReply ||
         safeReply;
+
+      let finalBaristaReply = baristaReply;
+
+      if (shouldMentionClubArte(message)) {
+        finalBaristaReply +=
+          "\n\nSi vas a explorar nuestros cafés, te interesa acceder al Club Arte. Cada compra construye beneficios que podrás disfrutar en tu próxima experiencia.";
+        finalBaristaReply +=
+          "\n\n¿Quieres que te muestre cómo acceder al Club Arte?";
+      }
   
       const inferredCoffee =
         inferCoffeeFromText(`${message} ${baristaReply}`) ??
@@ -360,7 +382,7 @@ export async function chatRoutes(app: FastifyInstance) {
   
       return reply.send({
         ok: true,
-        reply: baristaReply,
+        reply: finalBaristaReply,
         intent: nextState.activeTopic ?? "general",
         product: resolvedProducts[0] ?? null,
         products: resolvedProducts,

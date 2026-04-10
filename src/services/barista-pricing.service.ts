@@ -180,23 +180,38 @@ export async function buildCupEconomicsReply(params: {
 export function isCupEconomicsIntent(message: string): boolean {
   const text = message.toLowerCase();
 
+  export function isCupEconomicsIntent(message: string): boolean {
+  const text = message.toLowerCase().replace(/\s+/g, " ").trim();
+
   return (
     text.includes("margen por taza") ||
     text.includes("coste por taza") ||
     text.includes("costo por taza") ||
+    text.includes("cuánto cuesta la taza") ||
+    text.includes("cuanto cuesta la taza") ||
+    text.includes("cuánto me costaría cada taza") ||
+    text.includes("cuanto me costaria cada taza") ||
+    text.includes("costaría cada taza") ||
+    text.includes("costaria cada taza") ||
     text.includes("precio por taza") ||
     text.includes("precio recomendado") ||
     text.includes("precio sugerido") ||
+    text.includes("a qué precio") ||
+    text.includes("a que precio") ||
+    text.includes("a qué precio me sugieres") ||
+    text.includes("a que precio me sugieres") ||
+    text.includes("a qué precio lo vendo") ||
+    text.includes("a que precio lo vendo") ||
+    text.includes("a qué precio venderlo") ||
+    text.includes("a que precio venderlo") ||
+    text.includes("precio de venta") ||
     text.includes("rentabilidad") ||
-    text.includes("gramos por taza") ||
-    text.includes("precio medio") ||
+    text.includes("beneficio por taza") ||
+    text.includes("margen de cada variedad") ||
     text.includes("coste de cada variedad") ||
     text.includes("costo de cada variedad") ||
-    text.includes("margen de cada variedad") ||
-    text.includes("precio de venta") ||
-    text.includes("a qué precio vender") ||
-    text.includes("a que precio vender") ||
-    text.includes("beneficio por taza")
+    text.includes("cada variedad") ||
+    text.includes("cada taza de cada variedad")
   );
 }
 
