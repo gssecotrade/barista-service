@@ -159,8 +159,9 @@ export async function chatRoutes(app: FastifyInstance) {
       const averageCupPrice = extractAverageCupPrice(message); 
 
       const lastProfessionalPlan =
-        isObject((mergedInputState as Record<string, unknown>).lastProfessionalPlan)
-          ? ((mergedInputState as Record<string, unknown>).lastProfessionalPlan as {
+        isObject(user.profile?.preferences) &&
+        isObject((user.profile?.preferences as Record<string, unknown>).lastProfessionalPlan)
+          ? ((user.profile?.preferences as Record<string, unknown>).lastProfessionalPlan as {
               coffeesPerDay?: number | null;
               days?: number | null;
               coffees?: Array<{
@@ -356,6 +357,14 @@ export async function chatRoutes(app: FastifyInstance) {
               lastUserGoal: nextState.lastUserGoal,
               lastAssistantSummary: nextState.lastAssistantSummary,
               conversationMode: nextState.conversationMode,
+              lastProfessionalPlan:
+                engineResult?.type === "professional_volume"
+                  ? {
+                      coffeesPerDay: engineResult.meta?.coffeesPerDay ?? null,
+                      days: engineResult.meta?.days ?? null,
+                      coffees: engineResult.mix?.lines ?? [],
+                    }
+                  : lastProfessionalPlan ?? null,
             },
             state: nextState,
           },
@@ -374,6 +383,14 @@ export async function chatRoutes(app: FastifyInstance) {
               lastUserGoal: nextState.lastUserGoal,
               lastAssistantSummary: nextState.lastAssistantSummary,
               conversationMode: nextState.conversationMode,
+              lastProfessionalPlan:
+                engineResult?.type === "professional_volume"
+                  ? {
+                      coffeesPerDay: engineResult.meta?.coffeesPerDay ?? null,
+                      days: engineResult.meta?.days ?? null,
+                      coffees: engineResult.mix?.lines ?? [],
+                    }
+                  : null,
             },
             state: nextState,
           },
