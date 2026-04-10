@@ -160,10 +160,9 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const averageCupPrice = extractAverageCupPrice(message); 
 
-      const lastProfessionalPlan =
-        isObject(user.profile?.preferences) &&
-        isObject((user.profile?.preferences as Record<string, unknown>).lastProfessionalPlan)
-          ? ((user.profile?.preferences as Record<string, unknown>).lastProfessionalPlan as {
+      const stateProfessionalPlan =
+        isObject((mergedInputState as Record<string, unknown>).lastProfessionalPlan)
+          ? ((mergedInputState as Record<string, unknown>).lastProfessionalPlan as {
               coffeesPerDay?: number | null;
               days?: number | null;
               coffees?: Array<{
@@ -183,6 +182,33 @@ export async function chatRoutes(app: FastifyInstance) {
               }>;
             })
           : null;
+
+      const preferencesProfessionalPlan =
+        isObject(user.profile?.preferences) &&
+        isObject((user.profile?.preferences as Record<string, unknown>).lastProfessionalPlan)
+          ? (((user.profile?.preferences as Record<string, unknown>).lastProfessionalPlan) as {
+              coffeesPerDay?: number | null;
+              days?: number | null;
+              coffees?: Array<{
+                handle: CoffeeHandle;
+                name: string;
+                percentage: number;
+                targetKg: number;
+                totalB2B?: number;
+                roundedTargetGrams?: number;
+                formatBreakdown?: Array<{
+                  variantId?: number | string | null;
+                  bagSizeGrams: number;
+                  quantity: number;
+                  priceB2B?: number;
+                  priceB2C?: number;
+                }>;
+              }>;
+            })
+          : null;
+
+      const lastProfessionalPlan =
+        stateProfessionalPlan ?? preferencesProfessionalPlan ?? null;
       
       const pricingContext =
         engineResult?.type === "professional_volume"
@@ -322,7 +348,7 @@ export async function chatRoutes(app: FastifyInstance) {
                 days: engineResult.meta?.days ?? null,
                 coffees: engineResult.mix?.lines ?? [],
               }
-            : (mergedInputState as Record<string, unknown>).lastProfessionalPlan ?? null,
+            : lastProfessionalPlan,
       });
   
       await prisma.baristaMessage.create({
@@ -359,14 +385,7 @@ export async function chatRoutes(app: FastifyInstance) {
               lastUserGoal: nextState.lastUserGoal,
               lastAssistantSummary: nextState.lastAssistantSummary,
               conversationMode: nextState.conversationMode,
-              lastProfessionalPlan:
-                engineResult?.type === "professional_volume"
-                  ? {
-                      coffeesPerDay: engineResult.meta?.coffeesPerDay ?? null,
-                      days: engineResult.meta?.days ?? null,
-                      coffees: engineResult.mix?.lines ?? [],
-                    }
-                  : lastProfessionalPlan ?? null,
+              lastProfessionalPlan: nextState.lastProfessionalPlan ?? null,          
             },
             state: nextState,
           },
@@ -385,14 +404,7 @@ export async function chatRoutes(app: FastifyInstance) {
               lastUserGoal: nextState.lastUserGoal,
               lastAssistantSummary: nextState.lastAssistantSummary,
               conversationMode: nextState.conversationMode,
-              lastProfessionalPlan:
-                engineResult?.type === "professional_volume"
-                  ? {
-                      coffeesPerDay: engineResult.meta?.coffeesPerDay ?? null,
-                      days: engineResult.meta?.days ?? null,
-                      coffees: engineResult.mix?.lines ?? [],
-                    }
-                  : null,
+              lastProfessionalPlan: nextState.lastProfessionalPlan ?? null,
             },
             state: nextState,
           },
