@@ -84,6 +84,8 @@ export async function chatRoutes(app: FastifyInstance) {
       }
   
       const { userId, message, context } = parsed.data;
+
+      console.log("CHAT USER", { userId, message });
   
       const user = await prisma.baristaUser.findUnique({
         where: { id: userId },
