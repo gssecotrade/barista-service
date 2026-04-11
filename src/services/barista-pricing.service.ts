@@ -69,30 +69,26 @@ const coffeeBusinessRules: Record<
   {
     name: string;
     recommendedGramsPerCup: number;
-    suggestedCupPriceMultiplier: number;
-    minimumSuggestedCupPrice: number;
+    professionalTargetCupPrice: number;
     role: string;
   }
 > = {
   catuai: {
     name: "Catuai",
     recommendedGramsPerCup: 8,
-    suggestedCupPriceMultiplier: 8.5,
-    minimumSuggestedCupPrice: 2.2,
+    professionalTargetCupPrice: 2.3,
     role: "base diaria / volumen",
   },
   pacamara: {
     name: "Pacamara",
-    recommendedGramsPerCup: 8.5,
-    suggestedCupPriceMultiplier: 9.5,
-    minimumSuggestedCupPrice: 2.8,
+    recommendedGramsPerCup: 8,
+    professionalTargetCupPrice: 2.6,
     role: "sobremesa / valor gastronómico",
   },
   geisha: {
     name: "Geisha",
-    recommendedGramsPerCup: 9,
-    suggestedCupPriceMultiplier: 11,
-    minimumSuggestedCupPrice: 3.8,
+    recommendedGramsPerCup: 8,
+    professionalTargetCupPrice: 2.9,
     role: "premium / diferenciación",
   },
 };
@@ -104,10 +100,7 @@ export async function buildCupEconomicsReply(params: {
 
   if (!isCupEconomicsIntent(message)) return null;
 
-  const mode: PricingMode = isCompleteEconomicsIntent(message)
-    ? "complete"
-    : "simple";
-
+  const audience = detectPricingAudience(message);
   const averageCupPrice = extractAverageCupPrice(message);
   const handles = extractCoffeeHandlesFromMessage(message);
   const targetHandles: CoffeeHandle[] =
@@ -119,59 +112,58 @@ export async function buildCupEconomicsReply(params: {
 
   const lines: string[] = [];
 
-  if (averageCupPrice !== null) {
+  if (audience === "consumer") {
     lines.push(
-      `Tomando como referencia tu precio medio actual de ${formatEuro(
-        averageCupPrice
-      )} por taza, esta sería la orientación por variedad:`,
+      "Tomando como referencia una dosis de 8 g por taza, este sería el coste aproximado en casa por variedad:",
       ""
     );
-  } else {
+
+    for (const product of products) {
+      const preferredVariant = pickPreferredVariant(product.handle, product.variants);
+      if (!preferredVariant) continue;
+
+      const costPerGram = preferredVariant.priceB2C / preferredVariant.bagSizeGrams;
+      const costPerCup = roundMoney(costPerGram * product.recommendedGramsPerCup);
+
+      lines.push(`${product.name}:`);
+      lines.push(`- formato de referencia: ${formatBagSize(preferredVariant.bagSizeGrams)}`);
+      lines.push(`- coste por taza en casa: ${formatEuro(costPerCup)}`);
+      lines.push("");
+    }
+
     lines.push(
-      "No trataría igual las tres referencias: mantendría Catuai como base de rotación, subiría Pacamara como taza más gastronómica y reservaría Geisha como propuesta claramente premium.",
-      "",
-      "Orientación por variedad:",
-      ""
+      "Si me dices si lo tomas en espresso, filtro o con leche, te afino qué variedad te encaja mejor."
     );
+
+    return lines.join("\n").trim();
   }
+
+  lines.push(
+    `Con una dosis de 8 g por taza y tomando como referencia tu precio actual de ${formatEuro(
+      averageCupPrice ?? 0
+    )}, esta sería la orientación profesional por variedad:`,
+    ""
+  );
 
   for (const product of products) {
     const preferredVariant = pickPreferredVariant(product.handle, product.variants);
     if (!preferredVariant) continue;
 
-    const costPerGramB2B =
-      preferredVariant.priceB2B / preferredVariant.bagSizeGrams;
-    const costPerCup = roundMoney(
-      costPerGramB2B * product.recommendedGramsPerCup
-    );
+    const costPerGram = preferredVariant.priceB2B / preferredVariant.bagSizeGrams;
+    const costPerCup = roundMoney(costPerGram * product.recommendedGramsPerCup);
+    const suggestedPrice = buildSuggestedCupPrice({
+      handle: product.handle,
+      averageCupPrice: currentPricePerCup,
+    });
+    const improvementPerCup = roundMoney(suggestedPrice - (averageCupPrice ?? 0));
 
     lines.push(`${product.name}:`);
-    lines.push(
-      `- formato de referencia: ${formatBagSize(preferredVariant.bagSizeGrams)}`
-    );
     lines.push(`- coste por taza: ${formatEuro(costPerCup)}`);
-
-    if (mode === "complete") {
-      const suggestedPrice = buildSuggestedCupPrice({
-        handle: product.handle,
-        costPerCup,
-        averageCupPrice,
-      });
-
-      const marginPerCup = roundMoney(suggestedPrice - costPerCup);
-
-      lines.push(`- precio recomendado: ${formatEuro(suggestedPrice)}`);
-      lines.push(`- margen por taza: ${formatEuro(marginPerCup)}`);
-      lines.push(`- rol en carta: ${describeRole(product.handle)}`);
-    }
-
+    lines.push(`- precio actual: ${formatEuro(averageCupPrice ?? 0)}`);
+    lines.push(`- precio recomendado: ${formatEuro(suggestedPrice)}`);
+    lines.push(`- mejora por taza: ${formatEuro(improvementPerCup)}`);
+    lines.push(`- rol en carta: ${describeRole(product.handle)}`);
     lines.push("");
-  }
-
-  if (mode === "simple") {
-    lines.push(
-      "Si quieres, te doy también una propuesta completa con precio recomendado y margen por taza para cada variedad."
-    );
   }
 
   return lines.join("\n").trim();
@@ -413,32 +405,14 @@ function pickPreferredVariant(
 
 function buildSuggestedCupPrice(params: {
   handle: CoffeeHandle;
-  costPerCup: number;
   averageCupPrice: number | null;
 }): number {
-  const { handle, costPerCup, averageCupPrice } = params;
+  const { handle, averageCupPrice } = params;
 
   const rule = coffeeBusinessRules[handle];
-  const baseSuggested = roundToTenCents(
-    Math.max(
-      costPerCup * rule.suggestedCupPriceMultiplier,
-      rule.minimumSuggestedCupPrice
-    )
+  return roundToTenCents(
+    Math.max(rule.professionalTargetCupPrice, averageCupPrice ?? 0)
   );
-
-  if (averageCupPrice === null) {
-    return baseSuggested;
-  }
-
-  if (handle === "geisha") {
-    return Math.max(baseSuggested, roundToTenCents(averageCupPrice + 1.2));
-  }
-
-  if (handle === "pacamara") {
-    return Math.max(baseSuggested, roundToTenCents(averageCupPrice + 0.5));
-  }
-
-  return Math.max(baseSuggested, roundToTenCents(averageCupPrice));
 }
 
 function extractCoffeeHandlesFromMessage(message: string): CoffeeHandle[] {
@@ -450,6 +424,27 @@ function extractCoffeeHandlesFromMessage(message: string): CoffeeHandle[] {
   if (text.includes("geisha")) handles.push("geisha");
 
   return Array.from(new Set(handles));
+}
+
+function detectPricingAudience(message: string): "consumer" | "professional" {
+  const text = message.toLowerCase();
+
+  const looksProfessional =
+    text.includes("restaurante") ||
+    text.includes("cafetería") ||
+    text.includes("cafeteria") ||
+    text.includes("bar") ||
+    text.includes("local") ||
+    text.includes("carta") ||
+    text.includes("vendo") ||
+    text.includes("sirvo") ||
+    text.includes("ticket medio") ||
+    text.includes("rotación") ||
+    text.includes("rotacion") ||
+    text.includes("horeca") ||
+    text.includes("sobremesa");
+
+  return looksProfessional ? "professional" : "consumer";
 }
 
 function matchFirstNumber(text: string, patterns: RegExp[]): number | null {
@@ -634,19 +629,12 @@ export async function buildProfessionalPricingStrategyReply(params: {
       (preferredVariant.priceB2B / preferredVariant.bagSizeGrams) * gramsPerCup
     );
 
-    let suggestedPrice = currentPricePerCup;
+    const suggestedPrice = buildSuggestedCupPrice({
+      handle: product.handle,
+      averageCupPrice: currentPricePerCup,
+    });
 
-    if (product.handle === "catuai") {
-      suggestedPrice = Math.max(currentPricePerCup + 0.2, 2.2);
-    } else if (product.handle === "pacamara") {
-      suggestedPrice = Math.max(currentPricePerCup + 0.5, 2.9);
-    } else if (product.handle === "geisha") {
-      suggestedPrice = Math.max(currentPricePerCup + 1.0, 3.8);
-    }
-
-    suggestedPrice = roundToTenCents(suggestedPrice);
-
-    const improvementPerCup = roundMoney(suggestedPrice - currentPricePerCup);
+    const improvementPerCup = roundMoney(suggestedPrice - (currentPricePerCup ?? 0));
 
     const mixLine = coffees.find((coffee) => coffee.handle === product.handle);
     const percentage =

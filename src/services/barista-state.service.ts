@@ -1,13 +1,14 @@
 export type ConversationMode = "continue" | "new" | null;
 export type DrinkType = "coffee" | "cocktail" | "mocktail" | null;
 
-export type ProfessionalPlanCoffee = {
+export type ProfessionalPlanLine = {
   handle: "catuai" | "geisha" | "pacamara";
   name: string;
   percentage: number;
   targetKg: number;
-  totalB2B?: number;
   roundedTargetGrams?: number;
+  totalB2B?: number;
+  totalB2C?: number;
   formatBreakdown?: Array<{
     variantId?: number | string | null;
     bagSizeGrams: number;
@@ -17,10 +18,10 @@ export type ProfessionalPlanCoffee = {
   }>;
 };
 
-export type ProfessionalPlanState = {
+export type ProfessionalPlan = {
   coffeesPerDay?: number | null;
   days?: number | null;
-  coffees?: ProfessionalPlanCoffee[];
+  coffees?: ProfessionalPlanLine[];
 } | null;
 
 export type BaristaState = {
@@ -46,7 +47,7 @@ export type BaristaState = {
   lastAssistantSummary: string | null;
   conversationMode: ConversationMode;
 
-  lastProfessionalPlan: ProfessionalPlanState;
+  lastProfessionalPlan: ProfessionalPlan;
 
   updatedAt: string | null;
 };
@@ -69,9 +70,7 @@ export const EMPTY_BARISTA_STATE: BaristaState = {
   updatedAt: null,
 };
 
-export function normalizeBaristaState(
-  input?: Partial<BaristaState> | null
-): BaristaState {
+export function normalizeBaristaState(input?: Partial<BaristaState> | null): BaristaState {
   return {
     activeTopic: input?.activeTopic ?? null,
     activeCoffee: input?.activeCoffee ?? null,
@@ -85,7 +84,7 @@ export function normalizeBaristaState(
     lastAssistantSummary: input?.lastAssistantSummary ?? null,
     conversationMode: input?.conversationMode ?? null,
 
-    lastProfessionalPlan: normalizeProfessionalPlan(input?.lastProfessionalPlan),
+    lastProfessionalPlan: input?.lastProfessionalPlan ?? null,
 
     updatedAt: input?.updatedAt ?? null,
   };
@@ -96,23 +95,16 @@ export function mergeBaristaState(
   patch: Partial<BaristaState> | null | undefined
 ): BaristaState {
   const base = normalizeBaristaState(current);
-
   const next = normalizeBaristaState({
     ...base,
     ...(patch || {}),
-    lastProfessionalPlan:
-      patch && "lastProfessionalPlan" in patch
-        ? patch.lastProfessionalPlan ?? null
-        : base.lastProfessionalPlan,
     updatedAt: new Date().toISOString(),
   });
 
   return next;
 }
 
-export function hasMeaningfulState(
-  state?: Partial<BaristaState> | null
-): boolean {
+export function hasMeaningfulState(state?: Partial<BaristaState> | null): boolean {
   if (!state) return false;
 
   return Boolean(
@@ -129,9 +121,7 @@ export function hasMeaningfulState(
   );
 }
 
-export function summarizeStateForWelcome(
-  state?: Partial<BaristaState> | null
-): string | null {
+export function summarizeStateForWelcome(state?: Partial<BaristaState> | null): string | null {
   if (!state) return null;
 
   if (state.lastAssistantSummary) return state.lastAssistantSummary;
@@ -156,11 +146,8 @@ export function summarizeStateForWelcome(
     return `La última vez estábamos viendo cómo preparar ${prettyCoffee(state.activeCoffee)}.`;
   }
 
-  if (
-    state.activeTopic === "professional" &&
-    state.lastProfessionalPlan?.coffeesPerDay
-  ) {
-    return `La última vez estábamos trabajando una propuesta profesional sobre ${state.lastProfessionalPlan.coffeesPerDay} cafés al día.`;
+  if (state.activeTopic === "professional" && state.lastProfessionalPlan?.coffeesPerDay) {
+    return `La última vez definimos una propuesta profesional con ${state.lastProfessionalPlan.coffeesPerDay} cafés al día.`;
   }
 
   if (state.activeCoffee) {
@@ -168,75 +155,6 @@ export function summarizeStateForWelcome(
   }
 
   return null;
-}
-
-function normalizeProfessionalPlan(
-  input?: ProfessionalPlanState | undefined
-): ProfessionalPlanState {
-  if (!input || typeof input !== "object") return null;
-
-  const coffees = Array.isArray(input.coffees)
-    ? input.coffees
-        .filter(
-          (
-            coffee
-          ): coffee is NonNullable<ProfessionalPlanState>["coffees"][number] =>
-            !!coffee &&
-            typeof coffee === "object" &&
-            (coffee.handle === "catuai" ||
-              coffee.handle === "pacamara" ||
-              coffee.handle === "geisha") &&
-            typeof coffee.name === "string" &&
-            typeof coffee.percentage === "number" &&
-            typeof coffee.targetKg === "number"
-        )
-        .map((coffee) => ({
-          handle: coffee.handle,
-          name: coffee.name,
-          percentage: coffee.percentage,
-          targetKg: coffee.targetKg,
-          totalB2B:
-            typeof coffee.totalB2B === "number" ? coffee.totalB2B : undefined,
-          roundedTargetGrams:
-            typeof coffee.roundedTargetGrams === "number"
-              ? coffee.roundedTargetGrams
-              : undefined,
-          formatBreakdown: Array.isArray(coffee.formatBreakdown)
-            ? coffee.formatBreakdown
-                .filter(
-                  (item) =>
-                    !!item &&
-                    typeof item === "object" &&
-                    typeof item.bagSizeGrams === "number" &&
-                    typeof item.quantity === "number"
-                )
-                .map((item) => ({
-                  variantId:
-                    typeof item.variantId === "string" ||
-                    typeof item.variantId === "number"
-                      ? item.variantId
-                      : null,
-                  bagSizeGrams: item.bagSizeGrams,
-                  quantity: item.quantity,
-                  priceB2B:
-                    typeof item.priceB2B === "number"
-                      ? item.priceB2B
-                      : undefined,
-                  priceB2C:
-                    typeof item.priceB2C === "number"
-                      ? item.priceB2C
-                      : undefined,
-                }))
-            : undefined,
-        }))
-    : [];
-
-  return {
-    coffeesPerDay:
-      typeof input.coffeesPerDay === "number" ? input.coffeesPerDay : null,
-    days: typeof input.days === "number" ? input.days : null,
-    coffees,
-  };
 }
 
 function prettyCoffee(coffee: string): string {
