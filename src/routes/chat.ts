@@ -158,6 +158,19 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const isPricingIntent = isCupEconomicsIntent(message)
 
+      const looksProfessional =
+        message.toLowerCase().includes("restaurante") ||
+        message.toLowerCase().includes("cafetería") ||
+        message.toLowerCase().includes("cafeteria") ||
+        message.toLowerCase().includes("bar") ||
+        message.toLowerCase().includes("local") ||
+        message.toLowerCase().includes("carta") ||
+        message.toLowerCase().includes("vendo") ||
+        message.toLowerCase().includes("ticket medio") ||
+        message.toLowerCase().includes("rotación") ||
+        message.toLowerCase().includes("rotacion") ||
+        message.toLowerCase().includes("horeca");
+
       const averageCupPrice = extractAverageCupPrice(message); 
 
       const stateProfessionalPlan =
@@ -240,20 +253,22 @@ export async function chatRoutes(app: FastifyInstance) {
           : buildCommercialQuantityReply(message);
       
       const forcedEconomicsReply = isPricingIntent
-        ? await buildProfessionalPricingStrategyReply({
-            currentPricePerCup: averageCupPrice ?? 2.5,
-            message,
-            context: pricingContext
-              ? {
-                  coffeesPerDay: pricingContext.coffeesPerDay ?? null,
-                  days: pricingContext.days ?? null,
-                }
-              : null,
-            coffees:
-              pricingContext?.coffees && pricingContext.coffees.length > 0
-                ? pricingContext.coffees
-                : [],
-          })
+        ? looksProfessional
+          ? await buildProfessionalPricingStrategyReply({
+              currentPricePerCup: averageCupPrice ?? 2.3,
+              message,
+              context: pricingContext
+                ? {
+                    coffeesPerDay: pricingContext.coffeesPerDay ?? null,
+                    days: pricingContext.days ?? null,
+                  }
+                : null,
+              coffees:
+                pricingContext?.coffees && pricingContext.coffees.length > 0
+                  ? pricingContext.coffees
+                  : [],
+            })
+          : await buildCupEconomicsReply({ message })
         : null;
 
       const safeReply =
@@ -263,8 +278,8 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const baristaReply =
         forcedEconomicsReply ||
-        engineResult?.reply ||
         forcedCommercialReply ||
+        engineResult?.reply ||
         safeReply;
 
       let finalBaristaReply = baristaReply;
