@@ -104,6 +104,20 @@ export async function buildCupEconomicsReply(params: {
 
   if (!isCupEconomicsIntent(message)) return null;
 
+  const text = message.toLowerCase();
+  const isProfessional =
+    text.includes("restaurante") ||
+    text.includes("cafetería") ||
+    text.includes("cafeteria") ||
+    text.includes("local") ||
+    text.includes("negocio") ||
+    text.includes("vendo") ||
+    text.includes("vendo mi café") ||
+    text.includes("vendo mi cafe") ||
+    text.includes("carta") ||
+    text.includes("horeca");
+
+  const averageCupPrice = extractAverageCupPrice(message);
   const handles = extractCoffeeHandlesFromMessage(message);
   const targetHandles: CoffeeHandle[] =
     handles.length > 0 ? handles : ["catuai", "pacamara", "geisha"];
@@ -113,30 +127,23 @@ export async function buildCupEconomicsReply(params: {
   );
 
   const lines: string[] = [];
-  lines.push(
-    "Tomando una dosis fija de 8 g por taza, este sería el coste aproximado por variedad:",
-    ""
-  );
 
-  for (const product of products) {
-    const preferredVariant = pickPreferredVariant(product.handle, product.variants);
-    if (!preferredVariant) continue;
-
-    const costPerGramB2C = preferredVariant.priceB2C / preferredVariant.bagSizeGrams;
-    const costPerCup = roundMoney(costPerGramB2C * 8);
-
-    lines.push(`${product.name}:`);
-    lines.push(`- formato de referencia: ${formatBagSize(preferredVariant.bagSizeGrams)}`);
-    lines.push(`- coste por taza: ${formatEuro(costPerCup)}`);
+  if (!isProfessional) {
+    lines.push("Tomando una dosis de 8 g por taza, el coste orientativo sería:");
     lines.push("");
+
+    for (const product of products) {
+      const preferredVariant = pickPreferredVariant(product.handle, product.variants);
+      if (!preferredVariant) continue;
+
+      const costPerGram = preferredVariant.priceB2C / preferredVariant.bagSizeGrams;
+      const costPerCup = roundMoney(costPerGram * 8);
+
+      lines.push(`${product.name}: ${formatEuro(costPerCup)} por taza`);
+    }
+
+    return lines.join("\n").trim();
   }
-
-  lines.push(
-    "Si me dices cuántos cafés tomas al día y en qué momentos, te digo qué combinación te encaja mejor y te propongo compra directa en pack o suscripción."
-  );
-
-  return lines.join("\n").trim();
-}
 
   lines.push(
     `Con una dosis de 8 g por taza y tomando como referencia tu precio actual de ${formatEuro(
@@ -150,12 +157,16 @@ export async function buildCupEconomicsReply(params: {
     if (!preferredVariant) continue;
 
     const costPerGram = preferredVariant.priceB2B / preferredVariant.bagSizeGrams;
-    const costPerCup = roundMoney(costPerGram * product.recommendedGramsPerCup);
+    const costPerCup = roundMoney(costPerGram * 8);
+
     const suggestedPrice = buildSuggestedCupPrice({
       handle: product.handle,
-      averageCupPrice: currentPricePerCup,
+      averageCupPrice: averageCupPrice ?? null,
     });
-    const improvementPerCup = roundMoney(suggestedPrice - (averageCupPrice ?? 0));
+
+    const improvementPerCup = roundMoney(
+      suggestedPrice - (averageCupPrice ?? 0)
+    );
 
     lines.push(`${product.name}:`);
     lines.push(`- coste por taza: ${formatEuro(costPerCup)}`);
