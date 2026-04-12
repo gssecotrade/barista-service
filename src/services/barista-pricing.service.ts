@@ -105,21 +105,17 @@ export async function buildCupEconomicsReply(params: {
   if (!isCupEconomicsIntent(message)) return null;
 
   const text = message.toLowerCase();
+
   const isProfessional =
     text.includes("restaurante") ||
     text.includes("cafetería") ||
-    text.includes("cafeteria") ||
+    text.includes("bar") ||
     text.includes("local") ||
-    text.includes("negocio") ||
-    text.includes("vendo") ||
-    text.includes("vendo mi café") ||
-    text.includes("vendo mi cafe") ||
-    text.includes("carta") ||
-    text.includes("horeca");
+    text.includes("horeca") ||
+    text.includes("carta");
 
-  const averageCupPrice = extractAverageCupPrice(message);
   const handles = extractCoffeeHandlesFromMessage(message);
-  const targetHandles: CoffeeHandle[] =
+  const targetHandles =
     handles.length > 0 ? handles : ["catuai", "pacamara", "geisha"];
 
   const products = await Promise.all(
@@ -128,56 +124,50 @@ export async function buildCupEconomicsReply(params: {
 
   const lines: string[] = [];
 
+  // 🔵 B2C
   if (!isProfessional) {
-    lines.push("Tomando una dosis de 8 g por taza, el coste orientativo sería:");
+    lines.push("Coste por taza (8 g por dosis):");
     lines.push("");
 
     for (const product of products) {
-      const preferredVariant = pickPreferredVariant(product.handle, product.variants);
-      if (!preferredVariant) continue;
+      const v = pickPreferredVariant(product.handle, product.variants);
+      if (!v) continue;
 
-      const costPerGram = preferredVariant.priceB2C / preferredVariant.bagSizeGrams;
-      const costPerCup = roundMoney(costPerGram * 8);
+      const cost = roundMoney((v.priceB2C / v.bagSizeGrams) * 8);
 
-      lines.push(`${product.name}: ${formatEuro(costPerCup)} por taza`);
+      lines.push(`${product.name}: ${formatEuro(cost)}`);
     }
 
-    return lines.join("\n").trim();
+    return lines.join("\n");
   }
 
-  lines.push(
-    `Con una dosis de 8 g por taza y tomando como referencia tu precio actual de ${formatEuro(
-      averageCupPrice ?? 0
-    )}, esta sería la orientación profesional por variedad:`,
-    ""
-  );
+  // 🔴 B2B
+  const avg = extractAverageCupPrice(message) ?? 2.3;
+
+  const targetPrices = {
+    catuai: 2.3,
+    pacamara: 2.6,
+    geisha: 2.9,
+  };
+
+  lines.push("Análisis profesional (8 g por taza):");
+  lines.push("");
 
   for (const product of products) {
-    const preferredVariant = pickPreferredVariant(product.handle, product.variants);
-    if (!preferredVariant) continue;
+    const v = pickPreferredVariant(product.handle, product.variants);
+    if (!v) continue;
 
-    const costPerGram = preferredVariant.priceB2B / preferredVariant.bagSizeGrams;
-    const costPerCup = roundMoney(costPerGram * 8);
-
-    const suggestedPrice = buildSuggestedCupPrice({
-      handle: product.handle,
-      averageCupPrice: averageCupPrice ?? null,
-    });
-
-    const improvementPerCup = roundMoney(
-      suggestedPrice - (averageCupPrice ?? 0)
-    );
+    const cost = roundMoney((v.priceB2B / v.bagSizeGrams) * 8);
+    const suggested = targetPrices[product.handle];
 
     lines.push(`${product.name}:`);
-    lines.push(`- coste por taza: ${formatEuro(costPerCup)}`);
-    lines.push(`- precio actual: ${formatEuro(averageCupPrice ?? 0)}`);
-    lines.push(`- precio recomendado: ${formatEuro(suggestedPrice)}`);
-    lines.push(`- mejora por taza: ${formatEuro(improvementPerCup)}`);
-    lines.push(`- rol en carta: ${describeRole(product.handle)}`);
+    lines.push(`- coste: ${formatEuro(cost)}`);
+    lines.push(`- precio recomendado: ${formatEuro(suggested)}`);
+    lines.push(`- margen: ${formatEuro(suggested - cost)}`);
     lines.push("");
   }
 
-  return lines.join("\n").trim();
+  return lines.join("\n");
 }
 
 export function isCupEconomicsIntent(message: string): boolean {

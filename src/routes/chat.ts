@@ -150,13 +150,17 @@ export async function chatRoutes(app: FastifyInstance) {
         },
       });
   
-      const engineResult = await runBaristaDecisionEngine({ message });
+      const engineResult = forceStructuredAnswer
+        ? null
+        : await decisionEngine(...);
       console.log("ENGINE RESULT:", JSON.stringify(engineResult, null, 2));
 
       const suppressProductCardsForProfessionalVolume =
         engineResult?.type === "professional_volume";
 
       const isPricingIntent = isCupEconomicsIntent(message)
+
+      const forceStructuredAnswer = isPricingIntent;
 
       const looksProfessional =
         message.toLowerCase().includes("restaurante") ||
@@ -279,7 +283,7 @@ export async function chatRoutes(app: FastifyInstance) {
       const baristaReply =
         forcedEconomicsReply ||
         forcedCommercialReply ||
-        engineResult?.reply ||
+        (isPricingIntent ? null : engineResult?.reply) ||
         safeReply;
 
       let finalBaristaReply = baristaReply;
