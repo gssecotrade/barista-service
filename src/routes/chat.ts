@@ -20,23 +20,18 @@ import { runBaristaDecisionEngine } from "../services/barista-decision-engine.se
 function shouldMentionClubArte(userMessage: string): boolean {
   const msg = userMessage.toLowerCase();
 
-  const purchaseSignals = [
-    "comprar",
-    "pedido",
-    "pack",
-    "café",
-    "cafe",
-    "recomendar",
-    "cuál",
-    "cual",
-    "precio",
-    "envío",
-    "geisha",
-    "catuai",
-    "pacamara"
+  const explicitClubSignals = [
+    "club arte",
+    "club",
+    "beneficios",
+    "ventajas",
+    "fidelización",
+    "fidelizacion",
+    "descuentos",
+    "programa"
   ];
 
-  return purchaseSignals.some(signal => msg.includes(signal));
+  return explicitClubSignals.some((signal) => msg.includes(signal));
 }
 
 const chatBodySchema = z.object({
@@ -137,28 +132,7 @@ export async function chatRoutes(app: FastifyInstance) {
         },
       });
   
-      const { reply: rawBaristaReply, updatedContext } = await generateBaristaResponse({
-        userMessage: message,
-        history,
-        context: {
-          lastCoffee: mergedInputState.activeCoffee ?? undefined,
-          lastIntent: mergedInputState.activeTopic ?? undefined,
-          lastStyle: mergedInputState.activeDrinkType ?? undefined,
-          summary:
-            mergedInputState.lastAssistantSummary ??
-            buildFriendlySummary(mergedInputState),
-        },
-      });
-  
-      const engineResult = forceStructuredAnswer
-        ? null
-        : await decisionEngine(...);
-      console.log("ENGINE RESULT:", JSON.stringify(engineResult, null, 2));
-
-      const suppressProductCardsForProfessionalVolume =
-        engineResult?.type === "professional_volume";
-
-      const isPricingIntent = isCupEconomicsIntent(message)
+      const isPricingIntent = isCupEconomicsIntent(message);
 
       const forceStructuredAnswer = isPricingIntent;
 
@@ -175,7 +149,41 @@ export async function chatRoutes(app: FastifyInstance) {
         message.toLowerCase().includes("rotacion") ||
         message.toLowerCase().includes("horeca");
 
-      const averageCupPrice = extractAverageCupPrice(message); 
+      const averageCupPrice = extractAverageCupPrice(message);
+
+      const { reply: rawBaristaReply, updatedContext } = forceStructuredAnswer
+        ? {
+            reply: "",
+            updatedContext: {
+              lastCoffee: mergedInputState.activeCoffee ?? undefined,
+              lastIntent: mergedInputState.activeTopic ?? undefined,
+              lastStyle: mergedInputState.activeDrinkType ?? undefined,
+              summary:
+                mergedInputState.lastAssistantSummary ??
+                buildFriendlySummary(mergedInputState),
+            },
+          }
+        : await generateBaristaResponse({
+            userMessage: message,
+            history,
+            context: {
+              lastCoffee: mergedInputState.activeCoffee ?? undefined,
+              lastIntent: mergedInputState.activeTopic ?? undefined,
+              lastStyle: mergedInputState.activeDrinkType ?? undefined,
+              summary:
+                mergedInputState.lastAssistantSummary ??
+                buildFriendlySummary(mergedInputState),
+            },
+          });
+
+      const engineResult = forceStructuredAnswer
+        ? null
+        : await runBaristaDecisionEngine({ message });
+
+      console.log("ENGINE RESULT:", JSON.stringify(engineResult, null, 2));
+
+      const suppressProductCardsForProfessionalVolume =
+        engineResult?.type === "professional_volume";
 
       const stateProfessionalPlan =
         isObject((mergedInputState as Record<string, unknown>).lastProfessionalPlan)
@@ -203,7 +211,7 @@ export async function chatRoutes(app: FastifyInstance) {
       const preferencesProfessionalPlan =
         isObject(user.profile?.preferences) &&
         isObject((user.profile?.preferences as Record<string, unknown>).lastProfessionalPlan)
-          ? (((user.profile?.preferences as Record<string, unknown>).lastProfessionalPlan) as {
+          ? ((user.profile?.preferences as Record<string, unknown>).lastProfessionalPlan as {
               coffeesPerDay?: number | null;
               days?: number | null;
               coffees?: Array<{
@@ -226,7 +234,7 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const lastProfessionalPlan =
         stateProfessionalPlan ?? preferencesProfessionalPlan ?? null;
-      
+
       const pricingContext =
         engineResult?.type === "professional_volume"
           ? {
@@ -241,21 +249,21 @@ export async function chatRoutes(app: FastifyInstance) {
               coffees: lastProfessionalPlan.coffees ?? [],
             }
           : null;
-      
+
       console.log("PRICING ROUTE CHECK", {
         message,
-        isCupEconomics: isCupEconomicsIntent(message),
+        isCupEconomics: isPricingIntent,
         engineType: engineResult?.type ?? null,
         averageCupPrice,
         hasLastProfessionalPlan: !!lastProfessionalPlan,
         hasPricingContext: !!pricingContext,
       });
-      
+
       const forcedCommercialReply =
         engineResult?.type === "professional_volume"
           ? null
           : buildCommercialQuantityReply(message);
-      
+
       const forcedEconomicsReply = isPricingIntent
         ? looksProfessional
           ? await buildProfessionalPricingStrategyReply({
@@ -275,67 +283,70 @@ export async function chatRoutes(app: FastifyInstance) {
           : await buildCupEconomicsReply({ message })
         : null;
 
-      const safeReply =
-        isPricingIntent
-          ? rawBaristaReply
-          : sanitizeForbiddenContent(rawBaristaReply);
+      const safeReply = forceStructuredAnswer
+        ? ""
+        : sanitizeForbiddenContent(rawBaristaReply);
 
       const baristaReply =
         forcedEconomicsReply ||
         forcedCommercialReply ||
-        (isPricingIntent ? null : engineResult?.reply) ||
+        engineResult?.reply ||
         safeReply;
 
       let finalBaristaReply = baristaReply;
 
       if (shouldMentionClubArte(message)) {
         finalBaristaReply +=
-          "\n\nSi vas a explorar nuestros cafés, te interesa acceder al Club Arte. Cada compra construye beneficios que podrás disfrutar en tu próxima experiencia.";
+          "\n\nSi quieres, te explico de forma breve las ventajas de Club Arte.";
+      } else if (
+        !looksProfessional &&
+        isMonthlyQuantityIntent(message)
+      ) {
         finalBaristaReply +=
-          "\n\n¿Quieres que te muestre cómo acceder al Club Arte?";
+          "\n\nSi quieres, te preparo ahora mismo la combinación más lógica para comprar en web o dejarla resuelta en suscripción.";
       }
   
       const inferredCoffee =
-        inferCoffeeFromText(`${message} ${baristaReply}`) ??
+        inferCoffeeFromText(`${message} ${finalBaristaReply}`) ??
         normalizeCoffeeValue(updatedContext?.lastCoffee ?? null) ??
         mergedInputState.activeCoffee ??
         null;
   
       const inferredTopic =
-        inferTopicFromText(`${message} ${baristaReply}`) ??
+        inferTopicFromText(`${message} ${finalBaristaReply}`) ??
         mergedInputState.activeTopic ??
         "general";
   
       const inferredDrinkType =
-        inferDrinkTypeFromText(`${message} ${baristaReply}`) ??
+        inferDrinkTypeFromText(`${message} ${finalBaristaReply}`) ??
         mergedInputState.activeDrinkType ??
         null;
   
       const inferredRecipe =
-        inferRecipeFromText(`${message} ${baristaReply}`) ??
+        inferRecipeFromText(`${message} ${finalBaristaReply}`) ??
         mergedInputState.activeRecipe ??
         null;
   
       const shouldShowProduct =
         shouldReturnProduct({
           message,
-          reply: baristaReply,
+          reply: finalBaristaReply,
           topic: inferredTopic,
           coffee: inferredCoffee,
         }) &&
         !isCommercialClosingStep({
           message,
-          reply: baristaReply,
+          reply: finalBaristaReply,
         }) &&
         !isNonCommercialQuantityReply({
           message,
-          reply: baristaReply,
+          reply: finalBaristaReply,
         }) &&
         !suppressProductCardsForProfessionalVolume;
   
       const resolvedProducts = shouldShowProduct
         ? resolveProductsFromReply({
-            reply: baristaReply,
+            reply: finalBaristaReply,
             fallbackCoffee: inferredCoffee,
             topic: inferredTopic,
             recipe: inferredRecipe,
@@ -355,7 +366,7 @@ export async function chatRoutes(app: FastifyInstance) {
             topic: inferredTopic,
             recipe: inferredRecipe,
             drinkType: inferredDrinkType,
-            reply: baristaReply,
+            reply: finalBaristaReply,
           }) ??
           updatedContext?.summary ??
           mergedInputState.lastAssistantSummary,
@@ -374,7 +385,7 @@ export async function chatRoutes(app: FastifyInstance) {
         data: {
           userId,
           role: "assistant",
-          content: baristaReply,
+          content: finalBaristaReply,
           meta: {
             topic: nextState.activeTopic,
             coffee: nextState.activeCoffee,
