@@ -147,8 +147,8 @@ export async function chatRoutes(app: FastifyInstance) {
         message.toLowerCase().includes("rotacion") ||
         message.toLowerCase().includes("horeca");
 
-      
-      const forceStructuredAnswer = isPricingIntent;
+      const forceStructuredAnswer =
+        isPricingIntent || isMonthlyQuantityIntent(message);
 
       const averageCupPrice = extractAverageCupPrice(message);
 
@@ -277,6 +277,7 @@ export async function chatRoutes(app: FastifyInstance) {
                   }
                 : null,
               coffees:
+                Array.isArray(pricingContext?.coffees) &&
                 pricingContext?.coffees && pricingContext.coffees.length > 0
                   ? pricingContext.coffees
                   : [],
