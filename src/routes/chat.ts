@@ -134,8 +134,6 @@ export async function chatRoutes(app: FastifyInstance) {
   
       const isPricingIntent = isCupEconomicsIntent(message);
 
-      const forceStructuredAnswer = isPricingIntent;
-
       const looksProfessional =
         message.toLowerCase().includes("restaurante") ||
         message.toLowerCase().includes("cafetería") ||
@@ -148,6 +146,9 @@ export async function chatRoutes(app: FastifyInstance) {
         message.toLowerCase().includes("rotación") ||
         message.toLowerCase().includes("rotacion") ||
         message.toLowerCase().includes("horeca");
+
+      
+      const forceStructuredAnswer = isPricingIntent;
 
       const averageCupPrice = extractAverageCupPrice(message);
 
@@ -290,7 +291,7 @@ export async function chatRoutes(app: FastifyInstance) {
       const baristaReply =
         forcedEconomicsReply ||
         forcedCommercialReply ||
-        engineResult?.reply ||
+        (forceStructuredAnswer ? null : engineResult?.reply) ||
         safeReply;
 
       let finalBaristaReply = baristaReply;

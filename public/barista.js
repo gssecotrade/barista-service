@@ -507,39 +507,7 @@
   }
 
   function getSmartFallbackMessage() {
-    const lastIntent = getIntentLabel(conversationState.lastIntent);
-    const lastCoffee = prettyCoffeeName(conversationState.lastCoffee);
-    const lastSummary = conversationState.lastSummary
-      ? String(conversationState.lastSummary).trim()
-      : "";
-
-    if (lastIntent && lastCoffee) {
-      return `Estoy teniendo un pequeño problema técnico. Dame unos segundos y lo retomamos.
-
-Estábamos con una ${lastIntent} alrededor de ${lastCoffee}. Si quieres, dime si prefieres mantener esa línea o girar hacia algo más suave, más intenso o más especial para este momento.`;
-    }
-
-    if (lastIntent) {
-      return `Estoy teniendo un pequeño problema técnico. Dame unos segundos y lo retomamos.
-
-Estábamos trabajando una ${lastIntent}. Mientras vuelve, dime: ¿quieres que vayamos por una línea más clásica, más creativa o más gastronómica?`;
-    }
-
-    if (lastCoffee) {
-      return `Estoy teniendo un pequeño problema técnico. Dame unos segundos y lo retomamos.
-
-Seguíamos con ${lastCoffee}. Mientras tanto, dime si lo estás pensando para casa, para sobremesa o para una propuesta más especial.`;
-    }
-
-    if (lastSummary) {
-      return `Estoy teniendo un pequeño problema técnico. Dame unos segundos y lo retomamos.
-
-Mientras vuelve, dime: ¿te apetece algo más suave, más intenso o algo especial para este momento?`;
-    }
-
-    return `Estoy teniendo un pequeño problema técnico. Dame unos segundos y lo retomamos.
-
-Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial para este momento?`;
+    return "Ahora mismo no he podido procesar tu consulta. Escríbemela de nuevo en una frase y te respondo sin arrastrar contexto anterior.";
   }
 
   function getContextualCtaLabel(product) {
@@ -656,95 +624,107 @@ Mientras tanto, dime: ¿te apetece algo más suave, más intenso o algo especial
   }
 
   async function sendMessage(message) {
-    try {
-      appendLoading();
+  try {
+    appendLoading();
 
-      const currentSession = await ensureSession();
-      const previousCoffee = conversationState.lastCoffee || "";
+    const currentSession = await ensureSession();
+    const previousCoffee = conversationState.lastCoffee || "";
 
-      const res = await fetch(`${API_BASE}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: currentSession.userId,
-          message,
-          context: {
-            lastCoffee: conversationState.lastCoffee || null,
-            lastIntent: conversationState.lastIntent || null,
-          },
-        }),
-      });
+    const res = await fetch(`${API_BASE}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: currentSession.userId,
+        message,
+        context: {
+          lastCoffee: conversationState.lastCoffee || null,
+          lastIntent: conversationState.lastIntent || null,
+        },
+      }),
+    });
 
-      if (!res.ok) {
-        removeLoading();
-        appendAssistantMessage(getSmartFallbackMessage());
-        return;
-      }
+    if (!res.ok) {
+      let errorText = "";
+      try {
+        errorText = await res.text();
+      } catch {}
 
-      const data = await res.json();
+      console.error("BARISTA /chat HTTP ERROR", res.status, errorText);
+
       removeLoading();
-
-      conversationState.hasStarted = true;
-      conversationState.isKnownUser = true;
-      conversationState.lastIntent = data.intent || "";
-      conversationState.lastSummary =
-        data.state && data.state.lastAssistantSummary
-          ? data.state.lastAssistantSummary
-          : conversationState.lastSummary || "";
-
-          let showProductCard = false;
-
-          const responseProducts =
-            Array.isArray(data.products) && data.products.length
-              ? data.products
-              : data.product
-              ? [data.product]
-              : [];
-          
-          if (responseProducts.length) {
-            const firstProduct = responseProducts[0];
-            const newCoffee = firstProduct?.name || "";
-          
-            showProductCard =
-              responseProducts.length > 1 ||
-              !previousCoffee ||
-              previousCoffee !== newCoffee;
-          
-            if (newCoffee) {
-              conversationState.lastCoffee = newCoffee;
-            }
-          } else if (data.state?.activeCoffee) {
-            conversationState.lastCoffee = data.state.activeCoffee;
-          }
-
-      saveState();
-
-      if (session) {
-        session.profile = session.profile || {};
-        session.state = data.state || session.state || null;
-
-        saveSessionCache({
-          externalUserId,
-          userId: session.userId,
-          profile: session.profile,
-          state: session.state,
-          welcomeBack: true,
-          welcomeBackSummary: conversationState.lastSummary || "",
-        });
-      }
-
       appendAssistantMessage(
-        data.reply || "No he podido responder.",
-        responseProducts.length > 1
-          ? responseProducts
-          : responseProducts[0] || null,
-        showProductCard
+        "Ahora mismo no he podido procesar tu consulta. Escríbemela de nuevo en una frase y te respondo sin arrastrar contexto anterior."
       );
-    } catch {
-      removeLoading();
-      appendAssistantMessage(getSmartFallbackMessage());
+      return;
     }
+
+    const data = await res.json();
+    removeLoading();
+
+    conversationState.hasStarted = true;
+    conversationState.isKnownUser = true;
+    conversationState.lastIntent = data.intent || "";
+    conversationState.lastSummary =
+      data.state && data.state.lastAssistantSummary
+        ? data.state.lastAssistantSummary
+        : conversationState.lastSummary || "";
+
+    let showProductCard = false;
+
+    const responseProducts =
+      Array.isArray(data.products) && data.products.length
+        ? data.products
+        : data.product
+        ? [data.product]
+        : [];
+
+    if (responseProducts.length) {
+      const firstProduct = responseProducts[0];
+      const newCoffee = firstProduct?.name || "";
+
+      showProductCard =
+        responseProducts.length > 1 ||
+        !previousCoffee ||
+        previousCoffee !== newCoffee;
+
+      if (newCoffee) {
+        conversationState.lastCoffee = newCoffee;
+      }
+    } else if (data.state?.activeCoffee) {
+      conversationState.lastCoffee = data.state.activeCoffee;
+    }
+
+    saveState();
+
+    if (session) {
+      session.profile = session.profile || {};
+      session.state = data.state || session.state || null;
+
+      saveSessionCache({
+        externalUserId,
+        userId: session.userId,
+        profile: session.profile,
+        state: session.state,
+        welcomeBack: true,
+        welcomeBackSummary: conversationState.lastSummary || "",
+      });
+    }
+
+    appendAssistantMessage(
+      data.reply || "No he podido responder.",
+      responseProducts.length > 1
+        ? responseProducts
+        : responseProducts[0] || null,
+      showProductCard
+    );
+  } catch (error) {
+    console.error("BARISTA sendMessage ERROR", error);
+    removeLoading();
+    appendAssistantMessage(
+      "Ahora mismo no he podido procesar tu consulta. Escríbemela de nuevo en una frase y te respondo sin arrastrar contexto anterior."
+    );
   }
+}
 
   async function init() {
     if (initialized) return;
