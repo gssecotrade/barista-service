@@ -1013,9 +1013,11 @@ function extractTotalCoffeesFromText(message: string): number | null {
 
 function extractWeekdayDailyCoffeeCount(message: string): number | null {
   const patterns = [
-    /(\d+)\s*caf[eé]s?\s+al\s+d[ií]a\s+durante\s+la\s+semana/,
-    /(\d+)\s*caf[eé]s?\s+diarios?\s+entre\s+semana/,
-    /(\d+)\s*caf[eé]s?\s+por\s+d[ií]a\s+entre\s+semana/,
+    /(\d+)\s*caf[eé]s?\s+al\s+d[ií]a/,
+    /(\d+)\s*caf[eé]s?\s+diarios?/,
+    /consumo\s*(\d+)\s*caf[eé]s?\s+diarios?/,
+    /tomo\s*(\d+)\s*caf[eé]s?\s+al\s+d[ií]a/,
+    /si\s+consumo\s*(\d+)\s*caf[eé]s?\s+diarios?/,
   ];
 
   for (const pattern of patterns) {
