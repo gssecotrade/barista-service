@@ -82,22 +82,41 @@ export async function chatRoutes(app: FastifyInstance) {
 
       console.log("CHAT USER", { userId, message });
   
-      const user = await prisma.baristaUser.findUnique({
-        where: { id: userId },
-        include: {
-          profile: true,
-          messages: {
-            orderBy: { createdAt: "desc" },
-            take: 12,
+      let user;
+
+      try {
+        await prisma.$connect();
+
+        user = await prisma.baristaUser.findUnique({
+          where: { id: userId },
+          include: {
+            profile: true,
+            messages: {
+              orderBy: { createdAt: "desc" },
+              take: 12,
+            },
           },
-        },
-      });
-  
+        });
+      } catch (error) {
+        console.error("PRISMA USER LOOKUP ERROR:", error);
+
+        try {
+          await prisma.$disconnect();
+        } catch {}
+
+        return reply.status(500).send({
+          ok: false,
+          error: "database_connection_error",
+          message: "No se ha podido conectar con la base de datos.",
+        });
+      }
+
       if (!user) {
         return reply.status(404).send({
           error: "user_not_found",
         });
       }
+}
   
       const dbState = normalizeBaristaState(
         (user.profile?.state as Record<string, unknown> | null) ?? EMPTY_BARISTA_STATE
