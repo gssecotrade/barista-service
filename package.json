@@ -4,8 +4,9 @@
   "type": "module",
   "main": "src/app.ts",
   "scripts": {
-    "build": "echo \"build skipped\"",
-    "start": "node --import tsx src/app.ts"
+  "build": "prisma generate && tsc",
+  "start": "node dist/app.js",
+  "dev": "tsx src/app.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",
