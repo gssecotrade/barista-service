@@ -110,7 +110,6 @@ export async function chatRoutes(app: FastifyInstance) {
           error: "user_not_found",
         });
       }
-}
   
       const dbState = normalizeBaristaState(
         (user.profile?.state as Record<string, unknown> | null) ?? EMPTY_BARISTA_STATE
