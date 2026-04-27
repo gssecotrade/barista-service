@@ -82,11 +82,9 @@ export async function chatRoutes(app: FastifyInstance) {
 
       console.log("CHAT USER", { userId, message });
   
-      let user;
+      let user = null;
 
       try {
-        await prisma.$connect();
-
         user = await prisma.baristaUser.findUnique({
           where: { id: userId },
           include: {
@@ -100,14 +98,10 @@ export async function chatRoutes(app: FastifyInstance) {
       } catch (error) {
         console.error("PRISMA USER LOOKUP ERROR:", error);
 
-        try {
-          await prisma.$disconnect();
-        } catch {}
-
-        return reply.status(500).send({
+        return reply.status(503).send({
           ok: false,
-          error: "database_connection_error",
-          message: "No se ha podido conectar con la base de datos.",
+          error: "database_temporarily_unavailable",
+          message: "La base de datos no está disponible temporalmente.",
         });
       }
 
