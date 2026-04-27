@@ -4,7 +4,7 @@
   "type": "module",
   "main": "src/app.ts",
   "scripts": {
-    "build": "prisma generate",
+    "build": "echo \"build skipped\"",
     "start": "node --import tsx src/app.ts"
   },
   "dependencies": {
