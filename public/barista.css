@@ -699,3 +699,19 @@
   text-decoration: none;
   background: #fff;
 }
+
+.arte-combo-wrapper {
+  margin-bottom: 12px;
+}
+
+.arte-combo-button {
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  background: #b59a5a;
+  color: #0d1016;
+  padding: 14px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
