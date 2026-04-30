@@ -719,13 +719,16 @@
       });
     }
 
+    const forcedShowProductCard = responseProducts.length > 0;
+
     appendAssistantMessage(
       data.reply || "No he podido responder.",
       responseProducts.length > 1
         ? responseProducts
         : responseProducts[0] || null,
-      showProductCard
+      forcedShowProductCard
     );
+    
   } catch (error) {
     console.error("BARISTA sendMessage ERROR", error);
     removeLoading();
