@@ -357,16 +357,15 @@
 
   function buildProductCard(product) {
     if (!product) return null;
-  
+
     const safeName = escapeHtml(product.name || "");
     const safeUrl = escapeHtml(product.url || "#");
     const safeHandle = escapeHtml(product.handle || "");
-    const safeCtaLabel = escapeHtml(getContextualCtaLabel(product));
     const safeCtaTitle = escapeHtml(getContextualCtaTitle(product));
-  
+
     const card = document.createElement("div");
-    card.className = "arte-card";
-  
+    card.className = "arte-card arte-card--sales";
+
     card.innerHTML = `
       <div class="arte-card-minimal">
         <div class="arte-card-minimal-main">
@@ -374,8 +373,17 @@
           <div class="arte-card-title">${safeName}</div>
           <div class="arte-card-chips">${buildProductChips(product)}</div>
         </div>
-  
-        <div class="arte-card-actions arte-card-actions--minimal">
+
+        <div class="arte-card-actions arte-card-actions--sales">
+          <button
+            type="button"
+            class="arte-card-buy-button"
+            onclick="return window.arteBaristaAddToCart('${safeHandle}', this)"
+            aria-label="Añadir ${safeName} al carrito"
+          >
+            Añadir al carrito
+          </button>
+
           <a
             href="${safeUrl}?ref=barista"
             rel="noopener noreferrer"
@@ -383,30 +391,20 @@
             onclick="return window.arteBaristaNavigate('${safeHandle}')"
             data-product-click="true"
             data-product-handle="${safeHandle}"
-          >${safeCtaLabel}</a>
-  
-          <button
-            type="button"
-            class="arte-card-add-icon"
-            onclick="return window.arteBaristaAddToCart('${safeHandle}', this)"
-            aria-label="Añadir al carrito"
           >
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M8 10L12 4L16 10" stroke="#0d1016" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M6 10H18L17 19H7L6 10Z" stroke="#0d1016" stroke-width="1.6" stroke-linejoin="round"/>
-            </svg>
-          </button>
-  
+            Ver producto
+          </a>
+
           <div class="arte-card-feedback" aria-live="polite"></div>
         </div>
       </div>
     `;
-  
+
     card.querySelectorAll("[data-product-click='true']").forEach((link) => {
       link.addEventListener("click", async function () {
         try {
           const currentSession = await ensureSession();
-  
+
           await fetch(`${API_BASE}/track`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -421,7 +419,7 @@
         } catch {}
       });
     });
-  
+
     return card;
   }
   
