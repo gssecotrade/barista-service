@@ -156,6 +156,7 @@
   async function openPanel() {
     const panel = document.getElementById("arte-barista-panel");
     panel.style.display = "flex";
+    window.dispatchEvent(new Event("barista:open"));
     clearVisibleChat();
 
     appendLoading("Recuperando conversación…");
@@ -174,8 +175,9 @@
   function closePanel() {
     const panel = document.getElementById("arte-barista-panel");
     panel.style.display = "none";
-    clearVisibleChat();
     window.dispatchEvent(new Event("barista:close"));
+    clearVisibleChat();
+    
   }
 
   function clearVisibleChat() {
@@ -874,76 +876,72 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
     return false;
   }
 (function controlClubArteWithBarista() {
-  let baristaIsOpen = false;
-  let hideInterval = null;
+  let hiddenClubArteElements = [];
 
-  function isClubArteElement(el) {
-    if (!el || !el.textContent) return false;
+  function isBaristaElement(el) {
+    return !!el.closest?.("#arte-barista-panel, #arte-barista-button, .arte-barista");
+  }
 
-    const text = el.textContent.toLowerCase();
-    const cls = String(el.className || "").toLowerCase();
-    const id = String(el.id || "").toLowerCase();
+  function isBottomRightFloating(el) {
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
 
     return (
-      text.includes("club arte") ||
-      cls.includes("smile") ||
-      id.includes("smile") ||
-      cls.includes("launcher") ||
-      id.includes("launcher")
+      rect.width > 40 &&
+      rect.height > 30 &&
+      rect.right > window.innerWidth - 220 &&
+      rect.bottom > window.innerHeight - 220 &&
+      (style.position === "fixed" || style.position === "absolute")
     );
   }
 
-  function hideClubArte() {
-    document.querySelectorAll("iframe, button, div, span, a").forEach((el) => {
-      if (isClubArteElement(el)) {
-        const baristaPanel = el.closest("#arte-barista-panel");
-        const baristaWidget = el.closest("#arte-barista-widget");
+  window.hideClubArteWhenBaristaOpen = function () {
+    hiddenClubArteElements = [];
 
-        if (!baristaPanel && !baristaWidget) {
-          el.style.setProperty("display", "none", "important");
-          el.style.setProperty("visibility", "hidden", "important");
-          el.style.setProperty("pointer-events", "none", "important");
-        }
+    document.querySelectorAll("body *").forEach((el) => {
+      if (isBaristaElement(el)) return;
+
+      const text = (el.textContent || "").toLowerCase();
+      const cls = String(el.className || "").toLowerCase();
+      const id = String(el.id || "").toLowerCase();
+
+      const looksLikeClubArte =
+        text.includes("club arte") ||
+        cls.includes("smile") ||
+        id.includes("smile") ||
+        cls.includes("launcher") ||
+        id.includes("launcher") ||
+        isBottomRightFloating(el);
+
+      if (looksLikeClubArte) {
+        hiddenClubArteElements.push(el);
+        el.style.setProperty("display", "none", "important");
+        el.style.setProperty("visibility", "hidden", "important");
+        el.style.setProperty("pointer-events", "none", "important");
       }
     });
-  }
+  };
 
-  function showClubArte() {
-    document.querySelectorAll("iframe, button, div, span, a").forEach((el) => {
-      if (isClubArteElement(el)) {
-        el.style.removeProperty("display");
-        el.style.removeProperty("visibility");
-        el.style.removeProperty("pointer-events");
-      }
+  window.showClubArteWhenBaristaClosed = function () {
+    hiddenClubArteElements.forEach((el) => {
+      el.style.removeProperty("display");
+      el.style.removeProperty("visibility");
+      el.style.removeProperty("pointer-events");
     });
-  }
+
+    hiddenClubArteElements = [];
+  };
 
   window.addEventListener("barista:open", () => {
-    baristaIsOpen = true;
-    hideClubArte();
+    window.hideClubArteWhenBaristaOpen();
 
-    if (hideInterval) clearInterval(hideInterval);
-    hideInterval = setInterval(hideClubArte, 500);
+    setTimeout(window.hideClubArteWhenBaristaOpen, 300);
+    setTimeout(window.hideClubArteWhenBaristaOpen, 800);
+    setTimeout(window.hideClubArteWhenBaristaOpen, 1500);
   });
 
   window.addEventListener("barista:close", () => {
-    baristaIsOpen = false;
-
-    if (hideInterval) {
-      clearInterval(hideInterval);
-      hideInterval = null;
-    }
-
-    showClubArte();
-  });
-
-  const observer = new MutationObserver(() => {
-    if (baristaIsOpen) hideClubArte();
-  });
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
+    window.showClubArteWhenBaristaClosed();
   });
 })();
 };
