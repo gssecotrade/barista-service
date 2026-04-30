@@ -876,72 +876,97 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
     return false;
   }
 (function controlClubArteWithBarista() {
-  let hiddenClubArteElements = [];
+  let hiddenElements = [];
+  let interval = null;
 
-  function isBaristaElement(el) {
-    return !!el.closest?.("#arte-barista-panel, #arte-barista-button, .arte-barista");
+  function hideElement(el) {
+    if (!el || hiddenElements.includes(el)) return;
+
+    hiddenElements.push(el);
+
+    el.style.setProperty("display", "none", "important");
+    el.style.setProperty("visibility", "hidden", "important");
+    el.style.setProperty("opacity", "0", "important");
+    el.style.setProperty("pointer-events", "none", "important");
   }
 
-  function isBottomRightFloating(el) {
-    const rect = el.getBoundingClientRect();
-    const style = window.getComputedStyle(el);
-
-    return (
-      rect.width > 40 &&
-      rect.height > 30 &&
-      rect.right > window.innerWidth - 220 &&
-      rect.bottom > window.innerHeight - 220 &&
-      (style.position === "fixed" || style.position === "absolute")
+  function isInsideBarista(el) {
+    return !!el.closest?.(
+      "#arte-barista-panel, #arte-barista-button, #arte-barista-widget, .arte-barista"
     );
   }
 
-  window.hideClubArteWhenBaristaOpen = function () {
-    hiddenClubArteElements = [];
+  function findFloatingParent(el) {
+    let current = el;
 
+    while (current && current !== document.body) {
+      const style = window.getComputedStyle(current);
+      const rect = current.getBoundingClientRect();
+
+      const isFloating =
+        style.position === "fixed" ||
+        style.position === "absolute" ||
+        rect.bottom > window.innerHeight - 180 ||
+        rect.right > window.innerWidth - 220;
+
+      if (isFloating && !isInsideBarista(current)) {
+        return current;
+      }
+
+      current = current.parentElement;
+    }
+
+    return el;
+  }
+
+  function hideClubArte() {
     document.querySelectorAll("body *").forEach((el) => {
-      if (isBaristaElement(el)) return;
+      if (isInsideBarista(el)) return;
 
       const text = (el.textContent || "").toLowerCase();
       const cls = String(el.className || "").toLowerCase();
       const id = String(el.id || "").toLowerCase();
+      const aria = String(el.getAttribute?.("aria-label") || "").toLowerCase();
 
-      const looksLikeClubArte =
+      const isClubArte =
         text.includes("club arte") ||
+        aria.includes("club arte") ||
         cls.includes("smile") ||
         id.includes("smile") ||
         cls.includes("launcher") ||
-        id.includes("launcher") ||
-        isBottomRightFloating(el);
+        id.includes("launcher");
 
-      if (looksLikeClubArte) {
-        hiddenClubArteElements.push(el);
-        el.style.setProperty("display", "none", "important");
-        el.style.setProperty("visibility", "hidden", "important");
-        el.style.setProperty("pointer-events", "none", "important");
+      if (isClubArte) {
+        hideElement(findFloatingParent(el));
       }
     });
-  };
+  }
 
-  window.showClubArteWhenBaristaClosed = function () {
-    hiddenClubArteElements.forEach((el) => {
+  function showClubArte() {
+    hiddenElements.forEach((el) => {
       el.style.removeProperty("display");
       el.style.removeProperty("visibility");
+      el.style.removeProperty("opacity");
       el.style.removeProperty("pointer-events");
     });
 
-    hiddenClubArteElements = [];
-  };
+    hiddenElements = [];
+  }
 
   window.addEventListener("barista:open", () => {
-    window.hideClubArteWhenBaristaOpen();
+    hideClubArte();
 
-    setTimeout(window.hideClubArteWhenBaristaOpen, 300);
-    setTimeout(window.hideClubArteWhenBaristaOpen, 800);
-    setTimeout(window.hideClubArteWhenBaristaOpen, 1500);
+    if (interval) clearInterval(interval);
+    interval = setInterval(hideClubArte, 250);
   });
 
   window.addEventListener("barista:close", () => {
-    window.showClubArteWhenBaristaClosed();
+    if (interval) {
+      clearInterval(interval);
+      interval = null;
+    }
+
+    showClubArte();
   });
 })();
 };
