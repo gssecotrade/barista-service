@@ -168,12 +168,14 @@
       removeLoading();
       renderWelcomeView(null);
     }
+    window.dispatchEvent(new Event("barista:open"));
   }
 
   function closePanel() {
     const panel = document.getElementById("arte-barista-panel");
     panel.style.display = "none";
     clearVisibleChat();
+    window.dispatchEvent(new Event("barista:close"));
   }
 
   function clearVisibleChat() {
@@ -871,4 +873,28 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
 
     return false;
   }
+  (function controlClubArteWithBarista() {
+  function hideClubArte() {
+    document
+      .querySelectorAll(
+        'iframe[src*="smile"], .smile-launcher-frame, .smile-ui-lite-launcher-frame, div[class*="smile"], div[id*="smile"]'
+      )
+      .forEach((el) => {
+        el.style.display = "none";
+      });
+  }
+
+  function showClubArte() {
+    document
+      .querySelectorAll(
+        'iframe[src*="smile"], .smile-launcher-frame, .smile-ui-lite-launcher-frame, div[class*="smile"], div[id*="smile"]'
+      )
+      .forEach((el) => {
+        el.style.display = "";
+      });
+  }
+
+  window.addEventListener("barista:open", hideClubArte);
+  window.addEventListener("barista:close", showClubArte);
+})();
 };
