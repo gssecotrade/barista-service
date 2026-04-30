@@ -671,24 +671,31 @@
 .arte-card-actions--sales {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   align-items: stretch;
+  margin-top: 14px;
 }
 
 .arte-card-buy-button {
+  width: 100%;
   border: 0;
   border-radius: 999px;
   background: #0d1016;
   color: #fff;
-  padding: 11px 16px;
-  font-size: 14px;
+  padding: 13px 18px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
 }
 
 .arte-card-actions--sales a {
+  display: block;
   text-align: center;
-  font-size: 13px;
+  border: 1px solid rgba(13, 16, 22, 0.18);
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-size: 14px;
   color: #0d1016;
-  text-decoration: underline;
+  text-decoration: none;
+  background: #fff;
 }
