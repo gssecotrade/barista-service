@@ -156,10 +156,15 @@
   async function openPanel() {
     const panel = document.getElementById("arte-barista-panel");
     panel.style.display = "flex";
-    panel.style.zIndex = "2147483647"
+    panel.style.zIndex = "2147483647";
+
+    if (window.arteStartHideClubArte) {
+      window.arteStartHideClubArte();
+    }
+
     clearVisibleChat();
 
-    appendLoading("Recuperando conversación…");
+    appendLoading("Recuperando conversación...");
 
     try {
       const currentSession = await ensureSession(true);
@@ -174,9 +179,12 @@
   function closePanel() {
     const panel = document.getElementById("arte-barista-panel");
     panel.style.display = "none";
-    window.dispatchEvent(new Event("barista:close"));
+
+    if (window.arteStopHideClubArte) {
+      window.arteStopHideClubArte();
+    }
+
     clearVisibleChat();
-    
   }
 
   function clearVisibleChat() {
@@ -874,116 +882,45 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
 
     return false;
   }
-(function controlClubArteWithBarista() {
-  let hidden = [];
+(function forceHideClubArteWhenBaristaIsOpen() {
   let timer = null;
 
-  function isBarista(el) {
-    return !!el.closest?.(
-      "#arte-barista-panel, #arte-barista-button, #arte-barista-widget, .arte-barista"
-    );
-  }
-
-  function hide(el) {
-    if (!el || isBarista(el) || hidden.includes(el)) return;
-
-    hidden.push(el);
-
-    el.dataset.arteHiddenByBarista = "true";
-    el.style.setProperty("display", "none", "important");
-    el.style.setProperty("visibility", "hidden", "important");
-    el.style.setProperty("opacity", "0", "important");
-    el.style.setProperty("pointer-events", "none", "important");
-  }
-
-  function findFloatingContainer(el) {
-    let current = el;
-
-    while (current && current !== document.body) {
-      const style = window.getComputedStyle(current);
-      const rect = current.getBoundingClientRect();
-
-      if (
-        !isBarista(current) &&
-        (style.position === "fixed" || style.position === "absolute") &&
-        rect.width >= 40 &&
-        rect.height >= 30
-      ) {
-        return current;
-      }
-
-      current = current.parentElement;
-    }
-
-    return el;
-  }
-
   function hideClubArte() {
-    document.body.classList.add("arte-barista-open");
+    document.querySelectorAll("body *").forEach((el) => {
+      if (el.closest("#arte-barista-panel") || el.closest("#arte-barista-button")) return;
 
-    const points = [
-      [window.innerWidth - 80, window.innerHeight - 80],
-      [window.innerWidth - 120, window.innerHeight - 90],
-      [window.innerWidth - 160, window.innerHeight - 100],
-      [window.innerWidth - 80, window.innerHeight - 150],
-    ];
+      const text = (el.innerText || el.textContent || "").toLowerCase();
+      const rect = el.getBoundingClientRect();
 
-    points.forEach(([x, y]) => {
-      document.elementsFromPoint(x, y).forEach((el) => {
-        if (isBarista(el)) return;
+      const isClubArteText = text.includes("club arte");
 
-        const text = (el.textContent || "").toLowerCase();
-        const cls = String(el.className || "").toLowerCase();
-        const id = String(el.id || "").toLowerCase();
-        const aria = String(el.getAttribute?.("aria-label") || "").toLowerCase();
+      const isBlockingInput =
+        rect.right > window.innerWidth - 260 &&
+        rect.bottom > window.innerHeight - 170 &&
+        rect.width > 60 &&
+        rect.height > 35;
 
-        const looksLikeClub =
-          text.includes("club arte") ||
-          aria.includes("club arte") ||
-          cls.includes("smile") ||
-          id.includes("smile") ||
-          cls.includes("launcher") ||
-          id.includes("launcher");
-
-        const rect = el.getBoundingClientRect();
-        const isFloatingBottomRight =
-          rect.right > window.innerWidth - 260 &&
-          rect.bottom > window.innerHeight - 260 &&
-          rect.width > 40 &&
-          rect.height > 30;
-
-        if (looksLikeClub || isFloatingBottomRight) {
-          hide(findFloatingContainer(el));
-        }
-      });
+      if (isClubArteText || isBlockingInput) {
+        el.style.setProperty("display", "none", "important");
+        el.style.setProperty("visibility", "hidden", "important");
+        el.style.setProperty("opacity", "0", "important");
+        el.style.setProperty("pointer-events", "none", "important");
+      }
     });
   }
 
-  function showClubArte() {
-    document.body.classList.remove("arte-barista-open");
-
-    hidden.forEach((el) => {
-      el.style.removeProperty("display");
-      el.style.removeProperty("visibility");
-      el.style.removeProperty("opacity");
-      el.style.removeProperty("pointer-events");
-      delete el.dataset.arteHiddenByBarista;
-    });
-
-    hidden = [];
-  }
-
-  window.addEventListener("barista:open", () => {
+  function startHideClubArte() {
     hideClubArte();
-
     if (timer) clearInterval(timer);
     timer = setInterval(hideClubArte, 200);
-  });
+  }
 
-  window.addEventListener("barista:close", () => {
+  function stopHideClubArte() {
     if (timer) clearInterval(timer);
     timer = null;
-    showClubArte();
-  });
+  }
+
+  window.arteStartHideClubArte = startHideClubArte;
+  window.arteStopHideClubArte = stopHideClubArte;
 })();
 };
