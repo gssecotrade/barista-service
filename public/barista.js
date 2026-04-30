@@ -873,28 +873,77 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
 
     return false;
   }
-  (function controlClubArteWithBarista() {
+(function controlClubArteWithBarista() {
+  let baristaIsOpen = false;
+  let hideInterval = null;
+
+  function isClubArteElement(el) {
+    if (!el || !el.textContent) return false;
+
+    const text = el.textContent.toLowerCase();
+    const cls = String(el.className || "").toLowerCase();
+    const id = String(el.id || "").toLowerCase();
+
+    return (
+      text.includes("club arte") ||
+      cls.includes("smile") ||
+      id.includes("smile") ||
+      cls.includes("launcher") ||
+      id.includes("launcher")
+    );
+  }
+
   function hideClubArte() {
-    document
-      .querySelectorAll(
-        'iframe[src*="smile"], .smile-launcher-frame, .smile-ui-lite-launcher-frame, div[class*="smile"], div[id*="smile"]'
-      )
-      .forEach((el) => {
-        el.style.display = "none";
-      });
+    document.querySelectorAll("iframe, button, div, span, a").forEach((el) => {
+      if (isClubArteElement(el)) {
+        const baristaPanel = el.closest("#arte-barista-panel");
+        const baristaWidget = el.closest("#arte-barista-widget");
+
+        if (!baristaPanel && !baristaWidget) {
+          el.style.setProperty("display", "none", "important");
+          el.style.setProperty("visibility", "hidden", "important");
+          el.style.setProperty("pointer-events", "none", "important");
+        }
+      }
+    });
   }
 
   function showClubArte() {
-    document
-      .querySelectorAll(
-        'iframe[src*="smile"], .smile-launcher-frame, .smile-ui-lite-launcher-frame, div[class*="smile"], div[id*="smile"]'
-      )
-      .forEach((el) => {
-        el.style.display = "";
-      });
+    document.querySelectorAll("iframe, button, div, span, a").forEach((el) => {
+      if (isClubArteElement(el)) {
+        el.style.removeProperty("display");
+        el.style.removeProperty("visibility");
+        el.style.removeProperty("pointer-events");
+      }
+    });
   }
 
-  window.addEventListener("barista:open", hideClubArte);
-  window.addEventListener("barista:close", showClubArte);
+  window.addEventListener("barista:open", () => {
+    baristaIsOpen = true;
+    hideClubArte();
+
+    if (hideInterval) clearInterval(hideInterval);
+    hideInterval = setInterval(hideClubArte, 500);
+  });
+
+  window.addEventListener("barista:close", () => {
+    baristaIsOpen = false;
+
+    if (hideInterval) {
+      clearInterval(hideInterval);
+      hideInterval = null;
+    }
+
+    showClubArte();
+  });
+
+  const observer = new MutationObserver(() => {
+    if (baristaIsOpen) hideClubArte();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
 })();
 };
