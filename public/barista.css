@@ -653,3 +653,17 @@
     width: min(100%, 340px);
   }
 }
+#arte-barista-panel {
+  z-index: 2147483647 !important;
+}
+
+#arte-barista-button {
+  z-index: 2147483646 !important;
+}
+
+.arte-barista-input-area,
+#arte-barista-input,
+#arte-barista-send {
+  position: relative !important;
+  z-index: 2147483647 !important;
+}

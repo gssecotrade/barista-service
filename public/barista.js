@@ -156,7 +156,7 @@
   async function openPanel() {
     const panel = document.getElementById("arte-barista-panel");
     panel.style.display = "flex";
-    window.dispatchEvent(new Event("barista:open"));
+    panel.style.zIndex = "2147483647"
     clearVisibleChat();
 
     appendLoading("Recuperando conversación…");
