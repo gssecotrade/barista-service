@@ -169,7 +169,6 @@
       removeLoading();
       renderWelcomeView(null);
     }
-    window.dispatchEvent(new Event("barista:open"));
   }
 
   function closePanel() {
@@ -876,40 +875,40 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
     return false;
   }
 (function controlClubArteWithBarista() {
-  let hiddenElements = [];
-  let interval = null;
+  let hidden = [];
+  let timer = null;
 
-  function hideElement(el) {
-    if (!el || hiddenElements.includes(el)) return;
+  function isBarista(el) {
+    return !!el.closest?.(
+      "#arte-barista-panel, #arte-barista-button, #arte-barista-widget, .arte-barista"
+    );
+  }
 
-    hiddenElements.push(el);
+  function hide(el) {
+    if (!el || isBarista(el) || hidden.includes(el)) return;
 
+    hidden.push(el);
+
+    el.dataset.arteHiddenByBarista = "true";
     el.style.setProperty("display", "none", "important");
     el.style.setProperty("visibility", "hidden", "important");
     el.style.setProperty("opacity", "0", "important");
     el.style.setProperty("pointer-events", "none", "important");
   }
 
-  function isInsideBarista(el) {
-    return !!el.closest?.(
-      "#arte-barista-panel, #arte-barista-button, #arte-barista-widget, .arte-barista"
-    );
-  }
-
-  function findFloatingParent(el) {
+  function findFloatingContainer(el) {
     let current = el;
 
     while (current && current !== document.body) {
       const style = window.getComputedStyle(current);
       const rect = current.getBoundingClientRect();
 
-      const isFloating =
-        style.position === "fixed" ||
-        style.position === "absolute" ||
-        rect.bottom > window.innerHeight - 180 ||
-        rect.right > window.innerWidth - 220;
-
-      if (isFloating && !isInsideBarista(current)) {
+      if (
+        !isBarista(current) &&
+        (style.position === "fixed" || style.position === "absolute") &&
+        rect.width >= 40 &&
+        rect.height >= 30
+      ) {
         return current;
       }
 
@@ -920,52 +919,70 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
   }
 
   function hideClubArte() {
-    document.querySelectorAll("body *").forEach((el) => {
-      if (isInsideBarista(el)) return;
+    document.body.classList.add("arte-barista-open");
 
-      const text = (el.textContent || "").toLowerCase();
-      const cls = String(el.className || "").toLowerCase();
-      const id = String(el.id || "").toLowerCase();
-      const aria = String(el.getAttribute?.("aria-label") || "").toLowerCase();
+    const points = [
+      [window.innerWidth - 80, window.innerHeight - 80],
+      [window.innerWidth - 120, window.innerHeight - 90],
+      [window.innerWidth - 160, window.innerHeight - 100],
+      [window.innerWidth - 80, window.innerHeight - 150],
+    ];
 
-      const isClubArte =
-        text.includes("club arte") ||
-        aria.includes("club arte") ||
-        cls.includes("smile") ||
-        id.includes("smile") ||
-        cls.includes("launcher") ||
-        id.includes("launcher");
+    points.forEach(([x, y]) => {
+      document.elementsFromPoint(x, y).forEach((el) => {
+        if (isBarista(el)) return;
 
-      if (isClubArte) {
-        hideElement(findFloatingParent(el));
-      }
+        const text = (el.textContent || "").toLowerCase();
+        const cls = String(el.className || "").toLowerCase();
+        const id = String(el.id || "").toLowerCase();
+        const aria = String(el.getAttribute?.("aria-label") || "").toLowerCase();
+
+        const looksLikeClub =
+          text.includes("club arte") ||
+          aria.includes("club arte") ||
+          cls.includes("smile") ||
+          id.includes("smile") ||
+          cls.includes("launcher") ||
+          id.includes("launcher");
+
+        const rect = el.getBoundingClientRect();
+        const isFloatingBottomRight =
+          rect.right > window.innerWidth - 260 &&
+          rect.bottom > window.innerHeight - 260 &&
+          rect.width > 40 &&
+          rect.height > 30;
+
+        if (looksLikeClub || isFloatingBottomRight) {
+          hide(findFloatingContainer(el));
+        }
+      });
     });
   }
 
   function showClubArte() {
-    hiddenElements.forEach((el) => {
+    document.body.classList.remove("arte-barista-open");
+
+    hidden.forEach((el) => {
       el.style.removeProperty("display");
       el.style.removeProperty("visibility");
       el.style.removeProperty("opacity");
       el.style.removeProperty("pointer-events");
+      delete el.dataset.arteHiddenByBarista;
     });
 
-    hiddenElements = [];
+    hidden = [];
   }
 
   window.addEventListener("barista:open", () => {
     hideClubArte();
 
-    if (interval) clearInterval(interval);
-    interval = setInterval(hideClubArte, 250);
+    if (timer) clearInterval(timer);
+    timer = setInterval(hideClubArte, 200);
   });
 
   window.addEventListener("barista:close", () => {
-    if (interval) {
-      clearInterval(interval);
-      interval = null;
-    }
-
+    if (timer) clearInterval(timer);
+    timer = null;
     showClubArte();
   });
 })();
