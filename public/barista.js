@@ -193,41 +193,34 @@
   }
 
   function renderWelcomeView(currentSession) {
-  const lastConversation =
-    currentSession &&
-    currentSession.lastConversation &&
-    Array.isArray(currentSession.lastConversation.messages)
-      ? currentSession.lastConversation
-      : null;
+    const backendSummary =
+      currentSession &&
+      currentSession.state &&
+      typeof currentSession.state.lastAssistantSummary === "string"
+        ? currentSession.state.lastAssistantSummary
+        : "";
 
-  const lastUserMessage =
-    lastConversation && lastConversation.lastUserMessage
-      ? String(lastConversation.lastUserMessage).trim()
-      : "";
+    const localSummary = conversationState.lastSummary || "";
+    const summary = backendSummary || localSummary;
 
-  if (lastUserMessage) {
-    appendAssistantMessage(
-      `Bienvenido de nuevo.\n\nTu última consulta fue:\n“${lastUserMessage}”\n\n¿Quieres continuar esa conversación o empezar una nueva consulta?`
-    );
+    if (summary) {
+      appendAssistantMessage(
+        `Bienvenido de nuevo.\n\n${summary}\n\n¿Quieres continuar con eso o prefieres una nueva consulta?`
+      );
+      appendChoiceButtons();
+      conversationState.isKnownUser = true;
+      saveState();
+      return;
+    }
 
-    appendChoiceButtons(lastConversation.messages);
-    conversationState.isKnownUser = true;
-    saveState();
-    return;
+    if (conversationState.isKnownUser || conversationState.hasStarted) {
+      appendAssistantMessage("Bienvenido de nuevo.\n\n¿En qué puedo ayudarte hoy?");
+    } else {
+      appendAssistantMessage("Bienvenido a Arte Coffee.\n\n¿En qué puedo ayudarte?");
+    }
   }
 
-  if (conversationState.isKnownUser || conversationState.hasStarted) {
-    appendAssistantMessage("Bienvenido de nuevo.\n\n¿En qué puedo ayudarte hoy?");
-  } else {
-    appendAssistantMessage("Bienvenido a Arte Coffee.\n\n¿En qué puedo ayudarte?");
-  }
-}
-  function clearMessages() {
-    const el = messagesEl();
-    if (el) el.innerHTML = "";
-  }
-
-  function appendChoiceButtons(messages) {
+  function appendChoiceButtons() {
     const wrapper = document.createElement("div");
     wrapper.className = "arte-msg arte-msg-assistant";
 
@@ -246,28 +239,12 @@
 
         if (choice === "continue") {
           appendUserMessage("Continuar conversación");
-
-          / / 🔥 reconstruir conversación anterior (CLAVE)
-          if (Array.isArray(messages) && messages.length > 0) {
-            clearMessages();
-
-            messages.forEach((msg) => {
-              if (msg.role === "user") {
-                appendUserMessage(msg.content);
-              } else {
-                appendAssistantMessage(msg.content);
-              }
-            });
-          } else {
-            appendAssistantMessage("No hay conversación anterior disponible.");
-          }
-
+          await sendMessage("Quiero continuar con la conversación anterior");
         } else {
           conversationState.lastSummary = "";
           conversationState.lastIntent = "";
           conversationState.lastCoffee = "";
           saveState();
-
           appendUserMessage("Nueva consulta");
           appendAssistantMessage(
             "Perfecto. Empezamos de nuevo.\n\n¿Qué te apetece resolver hoy?"
