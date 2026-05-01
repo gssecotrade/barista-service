@@ -16,6 +16,7 @@ import {
   isCupEconomicsIntent,
 } from "../services/barista-pricing.service";
 import { runBaristaDecisionEngine } from "../services/barista-decision-engine.service";
+import { buildCommerceDecision } from "../services/barista-commerce-decision.service";
 
 function shouldMentionClubArte(userMessage: string): boolean {
   const msg = userMessage.toLowerCase();
@@ -143,6 +144,8 @@ export async function chatRoutes(app: FastifyInstance) {
           },
         },
       });
+
+      const commerceDecision = buildCommerceDecision(message);
   
       const isPricingIntent = isCupEconomicsIntent(message);
 
@@ -160,7 +163,7 @@ export async function chatRoutes(app: FastifyInstance) {
         message.toLowerCase().includes("horeca");
 
       const forceStructuredAnswer =
-        isPricingIntent || isMonthlyQuantityIntent(message);
+        isPricingIntent || isMonthlyQuantityIntent(message) || commerceDecision.handled;
 
       const averageCupPrice = extractAverageCupPrice(message);
 
@@ -301,7 +304,10 @@ export async function chatRoutes(app: FastifyInstance) {
         ? ""
         : sanitizeForbiddenContent(rawBaristaReply);
 
+      const commerceReply = commerceDecision.handled ? commerceDecision.reply : null;
+      
       const baristaReply =
+        commerceReply ||    
         forcedEconomicsReply ||
         forcedCommercialReply ||
         (forceStructuredAnswer ? null : engineResult?.reply) ||
@@ -358,9 +364,26 @@ export async function chatRoutes(app: FastifyInstance) {
         }) &&
         !suppressProductCardsForProfessionalVolume;
   
-      const resolvedProducts = shouldShowProduct
+      const commerceProducts =
+        commerceDecision.products.length > 0
+          ? commerceDecision.products
+              .map((handle) =>
+                mapCoffeeToProduct(handle, {
+                  topic: "coffee_selection",
+                  recipe: null,
+                  userMessage: message,
+                  reply: baristaReply,
+                })
+              )
+              .filter(Boolean)
+          : [];  
+      
+     const resolvedProducts =
+      commerceProducts.length > 0
+        ? commerceProducts
+        : shouldShowProduct
         ? resolveProductsFromReply({
-            reply: finalBaristaReply,
+            reply: baristaReply,
             fallbackCoffee: inferredCoffee,
             topic: inferredTopic,
             recipe: inferredRecipe,
@@ -373,6 +396,7 @@ export async function chatRoutes(app: FastifyInstance) {
         activeTopic: inferredTopic,
         activeDrinkType: inferredDrinkType,
         activeRecipe: inferredRecipe,
+        pendingQuestion: commerceDecision.pendingQuestion ?? null
         lastUserGoal: message,
         lastAssistantSummary:
           buildAssistantSummary({
@@ -1021,6 +1045,25 @@ function extractTotalCoffeesFromText(message: string): number | null {
   }
 
   return total > 0 ? total : null;
+}
+
+function extractDailyCoffeeCount(message: string): number | null {
+  const patterns = [
+    /(\d+)\s*caf[eé]s?\s+al\s+d[ií]a/,
+    /(\d+)\s*caf[eé]s?\s+diarios?/,
+    /consumo\s*(\d+)\s*caf[eé]s?/,
+    /tomo\s*(\d+)\s*caf[eé]s?/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match) {
+      const value = Number(match[1]);
+      if (Number.isFinite(value)) return value;
+    }
+  }
+
+  return null;
 }
 
 function extractWeekdayDailyCoffeeCount(message: string): number | null {
