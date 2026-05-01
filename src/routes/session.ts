@@ -68,7 +68,33 @@ export async function sessionRoutes(app: FastifyInstance) {
       (user.profile?.state as Record<string, unknown> | null) ?? EMPTY_BARISTA_STATE
     );
 
-    const welcomeBackSummary = summarizeStateForWelcome(state);
+    const recentMessages = await prisma.baristaMessage.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+    });
+
+    const orderedRecentMessages = recentMessages.slice().reverse();
+
+    const lastUserMessage =
+      orderedRecentMessages
+        .slice()
+        .reverse()
+        .find((msg) => msg.role === "user")?.content ?? null;
+
+    const lastAssistantMessage =
+      orderedRecentMessages
+        .slice()
+        .reverse()
+        .find((msg) => msg.role === "assistant")?.content ?? null;
+
+    const lastConversationSummary = lastUserMessage
+      ? `Tu última consulta fue: “${lastUserMessage.slice(0, 140)}${
+          lastUserMessage.length > 140 ? "..." : ""
+        }”.`
+      : null;
+
+    const memorySummary = summarizeStateForWelcome(state);
 
     return reply.send({
       ok: true,
@@ -79,8 +105,24 @@ export async function sessionRoutes(app: FastifyInstance) {
         preferences: user.profile?.preferences ?? {},
       },
       state,
-      welcomeBack: Boolean(welcomeBackSummary),
-      welcomeBackSummary,
+
+      // Nueva lógica correcta
+      welcomeBack: Boolean(lastConversationSummary || memorySummary),
+      welcomeBackSummary:
+        lastConversationSummary ??
+        "Puedo recuperar recomendaciones anteriores o empezar una nueva consulta.",
+
+      lastConversation: {
+        lastUserMessage,
+        lastAssistantMessage,
+        messages: orderedRecentMessages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+          createdAt: msg.createdAt,
+        })),
+      },
+
+      memorySummary,
     });
   });
 }
