@@ -193,34 +193,41 @@
   }
 
   function renderWelcomeView(currentSession) {
-    const backendSummary =
-      currentSession &&
-      currentSession.state &&
-      typeof currentSession.state.lastAssistantSummary === "string"
-        ? currentSession.state.lastAssistantSummary
-        : "";
+  const lastConversation =
+    currentSession &&
+    currentSession.lastConversation &&
+    Array.isArray(currentSession.lastConversation.messages)
+      ? currentSession.lastConversation
+      : null;
 
-    const localSummary = conversationState.lastSummary || "";
-    const summary = backendSummary || localSummary;
+  const lastUserMessage =
+    lastConversation && lastConversation.lastUserMessage
+      ? String(lastConversation.lastUserMessage).trim()
+      : "";
 
-    if (summary) {
-      appendAssistantMessage(
-        `Bienvenido de nuevo.\n\n${summary}\n\n¿Quieres continuar con eso o prefieres una nueva consulta?`
-      );
-      appendChoiceButtons();
-      conversationState.isKnownUser = true;
-      saveState();
-      return;
-    }
+  if (lastUserMessage) {
+    appendAssistantMessage(
+      `Bienvenido de nuevo.\n\nTu última consulta fue:\n“${lastUserMessage}”\n\n¿Quieres continuar esa conversación o empezar una nueva consulta?`
+    );
 
-    if (conversationState.isKnownUser || conversationState.hasStarted) {
-      appendAssistantMessage("Bienvenido de nuevo.\n\n¿En qué puedo ayudarte hoy?");
-    } else {
-      appendAssistantMessage("Bienvenido a Arte Coffee.\n\n¿En qué puedo ayudarte?");
-    }
+    appendChoiceButtons(lastConversation.messages);
+    conversationState.isKnownUser = true;
+    saveState();
+    return;
   }
 
-  function appendChoiceButtons() {
+  if (conversationState.isKnownUser || conversationState.hasStarted) {
+    appendAssistantMessage("Bienvenido de nuevo.\n\n¿En qué puedo ayudarte hoy?");
+  } else {
+    appendAssistantMessage("Bienvenido a Arte Coffee.\n\n¿En qué puedo ayudarte?");
+  }
+}
+  function clearMessages() {
+    const el = messagesEl();
+    if (el) el.innerHTML = "";
+  }
+
+  function appendChoiceButtons(messages) {
     const wrapper = document.createElement("div");
     wrapper.className = "arte-msg arte-msg-assistant";
 
@@ -239,12 +246,28 @@
 
         if (choice === "continue") {
           appendUserMessage("Continuar conversación");
-          await sendMessage("Quiero continuar con la conversación anterior");
+
+          / / 🔥 reconstruir conversación anterior (CLAVE)
+          if (Array.isArray(messages) && messages.length > 0) {
+            clearMessages();
+
+            messages.forEach((msg) => {
+              if (msg.role === "user") {
+                appendUserMessage(msg.content);
+              } else {
+                appendAssistantMessage(msg.content);
+              }
+            });
+          } else {
+            appendAssistantMessage("No hay conversación anterior disponible.");
+          }
+
         } else {
           conversationState.lastSummary = "";
           conversationState.lastIntent = "";
           conversationState.lastCoffee = "";
           saveState();
+
           appendUserMessage("Nueva consulta");
           appendAssistantMessage(
             "Perfecto. Empezamos de nuevo.\n\n¿Qué te apetece resolver hoy?"
