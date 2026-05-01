@@ -441,39 +441,56 @@
     const container = document.createElement("div");
     container.className = "arte-card-list";
 
-    // 🔥 BOTÓN COMBINADO (solo si hay más de 1 producto)
+    // 🔥 PACK REAL (prioridad sobre combinación manual)
     if (unique.length > 1) {
-      const comboWrapper = document.createElement("div");
-      comboWrapper.className = "arte-combo-wrapper";
+      const handles = unique.map(p => p.handle);
 
-      const comboButton = document.createElement("button");
-      comboButton.className = "arte-combo-button";
-      comboButton.innerText = "Añadir recomendación completa";
+      let pack = null;
 
-      comboButton.onclick = async function () {
-        try {
-          comboButton.disabled = true;
-          comboButton.innerText = "Añadiendo...";
+      // 👉 lógica basada en tus packs reales
+      if (handles.includes("catuai") && handles.includes("pacamara")) {
+        pack = {
+          name: "Pack Coffee Lover - Selección especial - 1 kg",
+          handle: "pack-coffee-lover-seleccion-especial",
+          url: "https://arte-coffee.com/products/pack-coffee-lover-seleccion-especial"
+        };
+      }
 
-          for (const product of unique.slice(0, 3)) {
-            await window.arteBaristaAddToCart(product.handle);
-          }
+      if (handles.includes("catuai") && unique.length === 1) {
+        pack = {
+          name: "Pack Daily Coffee - Consumo diario - 1 kg",
+          handle: "pack-daily-coffee-consumo-diario",
+          url: "https://arte-coffee.com/products/pack-daily-coffee-consumo-diario"
+        };
+      }
 
-          comboButton.innerText = "Añadido ✔";
-        } catch (e) {
-          comboButton.innerText = "Error";
-        } finally {
-          setTimeout(() => {
-            comboButton.disabled = false;
-            comboButton.innerText = "Añadir recomendación completa";
-          }, 2000);
-        }
+      if (pack) {
+        const packWrapper = document.createElement("div");
+        packWrapper.className = "arte-pack-wrapper";
 
-        return false;
-      };
+        packWrapper.innerHTML = `
+          <div class="arte-pack-card">
+            <div class="arte-card-kicker">RECOMENDACIÓN ARTE COFFEE</div>
+            <div class="arte-card-title">${pack.name}</div>
 
-      comboWrapper.appendChild(comboButton);
-      container.appendChild(comboWrapper);
+            <div class="arte-card-actions arte-card-actions--sales">
+              <button
+                class="arte-card-buy-button"
+                onclick="return window.arteBaristaAddToCart('${pack.handle}', this)"
+              >
+                Añadir pack al carrito
+              </button>
+
+              <a href="${pack.url}?ref=barista">
+                Ver pack
+              </a>
+            </div>
+          </div>
+        `;
+
+        container.appendChild(packWrapper);
+        return container; // 🔥 importante: no mostrar productos sueltos
+      }
     }
 
     // productos individuales
