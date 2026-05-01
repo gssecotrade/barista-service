@@ -396,7 +396,7 @@ export async function chatRoutes(app: FastifyInstance) {
         activeTopic: inferredTopic,
         activeDrinkType: inferredDrinkType,
         activeRecipe: inferredRecipe,
-        pendingQuestion: commerceDecision.pendingQuestion ?? null
+        pendingQuestion: commerceDecision.pendingQuestion ?? null,
         lastUserGoal: message,
         lastAssistantSummary:
           buildAssistantSummary({
