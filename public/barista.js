@@ -3,24 +3,6 @@
     (window.ARTE_BARISTA_CONFIG && window.ARTE_BARISTA_CONFIG.apiBase) ||
     "https://barista.arte-coffee.com";
 
-  const ARTE_PACKS = {
-  daily: {
-    name: "Pack Daily Coffee - Consumo diario - 1 kg",
-    handle: "pack-daily-coffee-consumo-diario",
-    url: "https://arte-coffee.com/products/pack-daily-coffee-consumo-diario",
-  },
-  lover: {
-    name: "Pack Coffee Lover - Selección especial - 1 kg",
-    handle: "pack-coffee-lover-seleccion-especial",
-    url: "https://arte-coffee.com/products/pack-coffee-lover-seleccion-especial",
-  },
-  experience: {
-    name: "Coffee Experience",
-    handle: "coffee-experience-kit",
-    url: "https://arte-coffee.com/products/coffee-experience-kit",
-  },
-};
-
   const LOGO_MONOGRAM_SRC =
     "https://barista.arte-coffee.com/public/arte-coffee-monogram-white.png?v=300";
   const STORAGE_KEY = "arte_barista_ui_state_v5";
@@ -304,7 +286,7 @@
           ? [productData]
           : [];
     
-      const cards = renderProductCards(productList, text);
+      const cards = renderProductCards(productList);
     
       if (cards) {
         wrapper.appendChild(cards);
@@ -441,7 +423,7 @@
     return card;
   }
   
-  function renderProductCards(products, assistantText = "") {
+  function renderProductCards(products) {
     if (!Array.isArray(products) || !products.length) return null;
 
     const unique = [];
@@ -459,87 +441,48 @@
     const container = document.createElement("div");
     container.className = "arte-card-list";
 
-    const pack = detectRecommendedPack(unique, assistantText);
+    // 🔥 BOTÓN COMBINADO (solo si hay más de 1 producto)
+    if (unique.length > 1) {
+      const comboWrapper = document.createElement("div");
+      comboWrapper.className = "arte-combo-wrapper";
 
-    if (pack) {
-      const packCard = buildPackCard(pack);
-      if (packCard) container.appendChild(packCard);
-    }
-      return container;
+      const comboButton = document.createElement("button");
+      comboButton.className = "arte-combo-button";
+      comboButton.innerText = "Añadir recomendación completa";
+
+      comboButton.onclick = async function () {
+        try {
+          comboButton.disabled = true;
+          comboButton.innerText = "Añadiendo...";
+
+          for (const product of unique.slice(0, 3)) {
+            await window.arteBaristaAddToCart(product.handle);
+          }
+
+          comboButton.innerText = "Añadido ✔";
+        } catch (e) {
+          comboButton.innerText = "Error";
+        } finally {
+          setTimeout(() => {
+            comboButton.disabled = false;
+            comboButton.innerText = "Añadir recomendación completa";
+          }, 2000);
+        }
+
+        return false;
+      };
+
+      comboWrapper.appendChild(comboButton);
+      container.appendChild(comboWrapper);
     }
 
+    // productos individuales
     unique.slice(0, 3).forEach((product) => {
       const card = buildProductCard(product);
       if (card) container.appendChild(card);
     });
 
     return container;
-  }
-
-  function detectRecommendedPack(products, assistantText = "") {
-    const text = `${assistantText} ${products.map((p) => p.name || p.handle || "").join(" ")}`.toLowerCase();
-
-    const hasCatuai = text.includes("catuai");
-    const hasPacamara = text.includes("pacamara");
-    const hasGeisha = text.includes("geisha");
-
-    const dailySignals =
-      text.includes("consumo diario") ||
-      text.includes("diario") ||
-      text.includes("rutina") ||
-      text.includes("cada día") ||
-      text.includes("cada dia") ||
-      text.includes("6 cafés") ||
-      text.includes("6 cafes") ||
-      text.includes("al mes") ||
-      text.includes("mensual");
-
-    if (hasCatuai && hasPacamara && hasGeisha) {
-      return ARTE_PACKS.experience;
-    }
-
-    if (hasCatuai && hasPacamara) {
-      return ARTE_PACKS.lover;
-    }
-
-    if (hasCatuai && dailySignals) {
-      return ARTE_PACKS.daily;
-    }
-
-    return null;
-  }
-
-  function buildPackCard(pack) {
-    if (!pack) return null;
-
-    const card = document.createElement("div");
-    card.className = "arte-card arte-pack-card";
-
-    card.innerHTML = `
-      <div class="arte-card-kicker">PACK RECOMENDADO</div>
-      <div class="arte-card-title">${escapeHtml(pack.name)}</div>
-
-      <div class="arte-card-actions arte-card-actions--sales">
-        <button
-          type="button"
-          class="arte-card-buy-button"
-          onclick="return window.arteBaristaAddToCart('${escapeHtml(pack.handle)}', this)"
-        >
-          Añadir pack al carrito
-        </button>
-
-        <a
-          href="${escapeHtml(pack.url)}?ref=barista"
-          rel="noopener noreferrer"
-        >
-          Ver pack
-        </a>
-
-        <div class="arte-card-feedback" aria-live="polite"></div>
-      </div>
-    `;
-
-    return card;
   }
   
   async function ensureSession(forceRefresh = false) {
