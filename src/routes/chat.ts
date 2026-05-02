@@ -790,39 +790,101 @@ function resolveProductsFromReply({
     .filter(Boolean) as ProductPayload[];
 }
 
-function resolvePackFromReply(message: string, reply: string): ProductPayload | null {
-  const source = `${message} ${reply}`.toLowerCase();
+function buildCommercialQuantityReply(message: string): string | null {
+  if (!isMonthlyQuantityIntent(message)) return null;
 
-  if (
-    source.includes("pack coffee lover") ||
-    (source.includes("catuai") && source.includes("pacamara"))
-  ) {
-    return {
-      handle: "pack-coffee-lover-seleccion-especial",
-      name: "Pack Coffee Lover - Selección especial - 1 kg",
-      reason:
-        "La opción más lógica para una compra combinada: Catuai como base diaria y Pacamara como café con más carácter.",
-      image: "",
-      url: "https://arte-coffee.com/products/pack-coffee-lover-seleccion-especial",
-    };
+  const normalized = message.toLowerCase();
+
+  const weekdayDaily =
+    extractWeekdayDailyCoffeeCount(normalized) ??
+    extractDailyCoffeeCount(normalized) ??
+    3;
+
+  const weekendDaily =
+    extractWeekendDailyCoffeeCount(normalized) ??
+    weekdayDaily;
+
+  const hasAfterMealMoment =
+    normalized.includes("después de comer") ||
+    normalized.includes("despues de comer") ||
+    normalized.includes("sobremesa") ||
+    normalized.includes("tarde") ||
+    normalized.includes("por la tarde");
+
+  const wantsSpecialMoment =
+    normalized.includes("fin de semana") ||
+    normalized.includes("fines de semana") ||
+    normalized.includes("especial") ||
+    normalized.includes("media mañana") ||
+    normalized.includes("media manana") ||
+    hasAfterMealMoment;
+
+  const wantsSingleCoffee =
+    normalized.includes("una sola referencia") ||
+    normalized.includes("un solo café") ||
+    normalized.includes("un solo cafe") ||
+    normalized.includes("solo un café") ||
+    normalized.includes("solo un cafe");
+
+  const estimatedMonthlyCups = weekdayDaily * 20 + weekendDaily * 8;
+
+  if (estimatedMonthlyCups >= 95) {
+    if (wantsSingleCoffee) {
+      return [
+        "Para ese consumo, no tiene sentido comprar formatos pequeños.",
+        "",
+        "Te recomiendo directamente el Pack Daily Coffee - Consumo diario - 1 kg.",
+        "",
+        "Es la opción más práctica para cubrir el mes con una sola referencia, mantener continuidad y no estar recomponiendo pedidos.",
+      ].join("\n");
+    }
+
+    if (wantsSpecialMoment) {
+      return [
+        "Para tu consumo mensual, la compra más lógica es un pack completo, no productos sueltos.",
+        "",
+        "Te recomiendo el Pack Coffee Lover - Selección especial - 1 kg.",
+        "",
+        "Te permite usar Catuai como café diario y reservar Pacamara para los momentos con más carácter: tarde, sobremesa o fin de semana.",
+      ].join("\n");
+    }
+
+    return [
+      "Para 6 cafés diarios, necesitas una solución estable, no ir comprando suelto.",
+      "",
+      "Te recomiendo el Pack Daily Coffee - Consumo diario - 1 kg.",
+      "",
+      "Es la opción más eficiente para cubrir el mes con continuidad, equilibrio y una compra sencilla.",
+    ].join("\n");
   }
 
-  if (
-    source.includes("pack daily coffee") ||
-    source.includes("2 bolsas de 500 g de catuai") ||
-    source.includes("consumo diario")
-  ) {
-    return {
-      handle: "pack-daily-coffee-consumo-diario",
-      name: "Pack Daily Coffee - Consumo diario - 1 kg",
-      reason:
-        "La opción más práctica para cubrir el consumo diario con una compra sencilla y mejor estructurada.",
-      image: "",
-      url: "https://arte-coffee.com/products/pack-daily-coffee-consumo-diario",
-    };
+  if (estimatedMonthlyCups >= 70) {
+    if (wantsSpecialMoment && !wantsSingleCoffee) {
+      return [
+        "Para ese consumo, te interesa combinar una base diaria con un café de más carácter.",
+        "",
+        "Te recomiendo el Pack Coffee Lover - Selección especial - 1 kg.",
+        "",
+        "Es una forma sencilla de tener variedad real sin complicarte con compras separadas.",
+      ].join("\n");
+    }
+
+    return [
+      "Para ese consumo, la opción más ordenada es resolver la compra con un formato mensual.",
+      "",
+      "Te recomiendo el Pack Daily Coffee - Consumo diario - 1 kg.",
+      "",
+      "Te cubre con comodidad y evita quedarte corto a mitad de mes.",
+    ].join("\n");
   }
 
-  return null;
+  return [
+    "Para un consumo moderado, no necesitas sobrecomprar.",
+    "",
+    "Te recomiendo empezar con Catuai en formato 250 g o 500 g, según la frecuencia con la que quieras reponer.",
+    "",
+    "Es el café más versátil para diario: suave, equilibrado y fácil de disfrutar en distintos métodos.",
+  ].join("\n");
 }
 
 function containsAnyCoffeeMention(value: string): boolean {
@@ -924,23 +986,29 @@ function buildCommercialQuantityReply(message: string): string | null {
 
   const normalized = message.toLowerCase();
 
-  const weekdayDaily = extractWeekdayDailyCoffeeCount(normalized) ?? extractDailyCoffeeCount(normalized) ?? 3;
-  const weekendDaily = extractWeekendDailyCoffeeCount(normalized) ?? weekdayDaily;
+  const weekdayDaily =
+    extractWeekdayDailyCoffeeCount(normalized) ??
+    extractDailyCoffeeCount(normalized) ??
+    3;
+
+  const weekendDaily =
+    extractWeekendDailyCoffeeCount(normalized) ??
+    weekdayDaily;
 
   const hasAfterMealMoment =
     normalized.includes("después de comer") ||
     normalized.includes("despues de comer") ||
-    normalized.includes("sobremesa");
+    normalized.includes("sobremesa") ||
+    normalized.includes("tarde") ||
+    normalized.includes("por la tarde");
 
-  const hasMidMorningMoment =
-    normalized.includes("media mañana") ||
-    normalized.includes("media manana");
-
-  const wantsPremiumWeekend =
+  const wantsSpecialMoment =
     normalized.includes("fin de semana") ||
     normalized.includes("fines de semana") ||
-    hasAfterMealMoment ||
-    hasMidMorningMoment;
+    normalized.includes("especial") ||
+    normalized.includes("media mañana") ||
+    normalized.includes("media manana") ||
+    hasAfterMealMoment;
 
   const wantsSingleCoffee =
     normalized.includes("una sola referencia") ||
@@ -949,102 +1017,64 @@ function buildCommercialQuantityReply(message: string): string | null {
     normalized.includes("solo un café") ||
     normalized.includes("solo un cafe");
 
-  const wantsTwoCoffees =
-    normalized.includes("combinar dos") ||
-    normalized.includes("dos referencias") ||
-    normalized.includes("dos cafés") ||
-    normalized.includes("dos cafes") ||
-    wantsPremiumWeekend;
-
   const estimatedMonthlyCups = weekdayDaily * 20 + weekendDaily * 8;
 
-  // Conversión comercial simple.
-  // No se verbaliza cálculo; solo se usa para decidir formatos.
-  // Regla práctica:
-  // - consumo bajo: 2 x 250 g
-  // - consumo medio: 3 x 250 g o 1 x 500 g + 1 x 250 g
-  // - consumo alto: 2 x 500 g
-  // - si hay fin de semana premium: base diaria + complemento premium 250 g
-  if (wantsSingleCoffee) {
-    return buildSingleCoffeeMonthlyReply(estimatedMonthlyCups);
-  }
-
-  if (wantsTwoCoffees || wantsPremiumWeekend) {
-    if (estimatedMonthlyCups >= 95) {
-      if (hasAfterMealMoment) {
-        return [
-          "Recomendación mensual:",
-          "Para tu consumo mensual, la opción más lógica es el Pack Coffee Lover - Selección especial - 1 kg.",
-          "",
-          "Te resuelve una compra combinada con Catuai como base diaria y Pacamara como café con más carácter para la tarde.",
-        ].join("\n");
-      }
-
-      return [
-        "Recomendación mensual:",
-        "- 2 bolsas de 500 g de Catuai para el consumo diario",
-        "- 1 bolsa de 250 g de Geisha para media mañana o fines de semana",
-        "",
-        "Resuelves el mes con una base equilibrada y un café más especial para los momentos en los que quieras subir el nivel.",
-      ].join("\n");
-    }
-
-    if (estimatedMonthlyCups >= 70) {
-      if (hasAfterMealMoment) {
-        return [
-          "Recomendación mensual:",
-          "- 1 bolsa de 500 g de Catuai para diario",
-          "- 1 bolsa de 250 g de Catuai para reforzar entre semana",
-          "- 1 bolsa de 250 g de Pacamara para sobremesas y fin de semana",
-          "",
-          "Es una combinación muy equilibrada: cubres el consumo habitual y reservas un perfil con más carácter para los mejores momentos.",
-        ].join("\n");
-      }
-
-      return [
-        "Recomendación mensual:",
-        "- 1 bolsa de 500 g de Catuai para diario",
-        "- 1 bolsa de 250 g de Catuai para reforzar el mes",
-        "- 1 bolsa de 250 g de Geisha para momentos más especiales",
-        "",
-        "Así cubres el mes con comodidad y añades una referencia más refinada para salir de la rutina.",
-      ].join("\n");
-    }
-
-    return [
-      "Recomendación mensual:",
-      "- 2 bolsas de 250 g de Catuai para el consumo base",
-      "- 1 bolsa de 250 g de Geisha o Pacamara para variar el fin de semana",
-      "",
-      "Es la forma más sencilla de tener café diario y, al mismo tiempo, una referencia con más personalidad para los momentos especiales.",
-    ].join("\n");
-  }
-
-  // Caso por defecto: una base clara y fácil de comprar
   if (estimatedMonthlyCups >= 95) {
+    if (wantsSingleCoffee) {
+      return [
+        "Para ese consumo, no tiene sentido comprar formatos pequeños.",
+        "",
+        "Te recomiendo directamente el Pack Daily Coffee - Consumo diario - 1 kg.",
+        "",
+        "Es la opción más práctica para cubrir el mes con una sola referencia, mantener continuidad y no estar recomponiendo pedidos.",
+      ].join("\n");
+    }
+
+    if (wantsSpecialMoment) {
+      return [
+        "Para tu consumo mensual, la compra más lógica es un pack completo, no productos sueltos.",
+        "",
+        "Te recomiendo el Pack Coffee Lover - Selección especial - 1 kg.",
+        "",
+        "Te permite usar Catuai como café diario y reservar Pacamara para los momentos con más carácter: tarde, sobremesa o fin de semana.",
+      ].join("\n");
+    }
+
     return [
-      "Recomendación mensual:",
-      "- 2 bolsas de 500 g de Catuai",
+      "Para 6 cafés diarios, necesitas una solución estable, no ir comprando suelto.",
       "",
-      "Es la opción más práctica para cubrir tu consumo mensual con continuidad, equilibrio y sin complicarte.",
+      "Te recomiendo el Pack Daily Coffee - Consumo diario - 1 kg.",
+      "",
+      "Es la opción más eficiente para cubrir el mes con continuidad, equilibrio y una compra sencilla.",
     ].join("\n");
   }
 
   if (estimatedMonthlyCups >= 70) {
+    if (wantsSpecialMoment && !wantsSingleCoffee) {
+      return [
+        "Para ese consumo, te interesa combinar una base diaria con un café de más carácter.",
+        "",
+        "Te recomiendo el Pack Coffee Lover - Selección especial - 1 kg.",
+        "",
+        "Es una forma sencilla de tener variedad real sin complicarte con compras separadas.",
+      ].join("\n");
+    }
+
     return [
-      "Recomendación mensual:",
-      "- 1 bolsa de 500 g de Catuai",
-      "- 1 bolsa de 250 g de Catuai",
+      "Para ese consumo, la opción más ordenada es resolver la compra con un formato mensual.",
       "",
-      "Cubres el mes con un perfil amable y versátil, en formatos cómodos de compra.",
+      "Te recomiendo el Pack Daily Coffee - Consumo diario - 1 kg.",
+      "",
+      "Te cubre con comodidad y evita quedarte corto a mitad de mes.",
     ].join("\n");
   }
 
   return [
-    "Recomendación mensual:",
-    "- 3 bolsas de 250 g de Catuai",
+    "Para un consumo moderado, no necesitas sobrecomprar.",
     "",
-    "Tienes cubierto el mes con una compra simple, fácil de gestionar y con un café muy agradecido para diario.",
+    "Te recomiendo empezar con Catuai en formato 250 g o 500 g, según la frecuencia con la que quieras reponer.",
+    "",
+    "Es el café más versátil para diario: suave, equilibrado y fácil de disfrutar en distintos métodos.",
   ].join("\n");
 }
 
