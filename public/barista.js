@@ -441,59 +441,6 @@
     const container = document.createElement("div");
     container.className = "arte-card-list";
 
-    // 🔥 PACK REAL (prioridad sobre combinación manual)
-    if (unique.length > 1) {
-      const handles = unique.map(p => p.handle);
-
-      let pack = null;
-
-      // 👉 lógica basada en tus packs reales
-      if (handles.includes("catuai") && handles.includes("pacamara")) {
-        pack = {
-          name: "Pack Coffee Lover - Selección especial - 1 kg",
-          handle: "pack-coffee-lover-seleccion-especial",
-          url: "https://arte-coffee.com/products/pack-coffee-lover-seleccion-especial"
-        };
-      }
-
-      if (handles.includes("catuai") && unique.length === 1) {
-        pack = {
-          name: "Pack Daily Coffee - Consumo diario - 1 kg",
-          handle: "pack-daily-coffee-consumo-diario",
-          url: "https://arte-coffee.com/products/pack-daily-coffee-consumo-diario"
-        };
-      }
-
-      if (pack) {
-        const packWrapper = document.createElement("div");
-        packWrapper.className = "arte-pack-wrapper";
-
-        packWrapper.innerHTML = `
-          <div class="arte-pack-card">
-            <div class="arte-card-kicker">RECOMENDACIÓN ARTE COFFEE</div>
-            <div class="arte-card-title">${pack.name}</div>
-
-            <div class="arte-card-actions arte-card-actions--sales">
-              <button
-                class="arte-card-buy-button"
-                onclick="return window.arteBaristaAddToCart('${pack.handle}', this)"
-              >
-                Añadir pack al carrito
-              </button>
-
-              <a href="${pack.url}?ref=barista">
-                Ver pack
-              </a>
-            </div>
-          </div>
-        `;
-
-        container.appendChild(packWrapper);
-        return container; // 🔥 importante: no mostrar productos sueltos
-      }
-    }
-
-    // productos individuales
     unique.slice(0, 3).forEach((product) => {
       const card = buildProductCard(product);
       if (card) container.appendChild(card);
