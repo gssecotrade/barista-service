@@ -12,6 +12,7 @@ import {
   buildCupEconomicsReply,
   buildProfessionalEconomicsReply,
   buildProfessionalPricingStrategyReply,
+  buildProductPriceReply,
   extractAverageCupPrice,
   isCupEconomicsIntent,
 } from "../services/barista-pricing.service";
@@ -280,6 +281,9 @@ export async function chatRoutes(app: FastifyInstance) {
           ? null
           : buildCommercialQuantityReply(message);
 
+      const forcedPriceResult = await buildProductPriceReply(message);
+      const forcedPriceReply = forcedPriceResult?.reply ?? null;
+      
       const forcedEconomicsReply = isPricingIntent
         ? looksProfessional
           ? await buildProfessionalPricingStrategyReply({
@@ -307,6 +311,7 @@ export async function chatRoutes(app: FastifyInstance) {
       const commerceReply = commerceDecision.handled ? commerceDecision.reply : null;
       
       const baristaReply =   
+        forcedPriceReply ||
         forcedCommercialReply ||
         commerceReply ||
         forcedEconomicsReply ||

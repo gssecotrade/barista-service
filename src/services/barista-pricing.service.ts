@@ -348,6 +348,69 @@ async function getProductPricing(handle: CoffeeHandle): Promise<ProductPricingIn
   };
 }
 
+export async function buildProductPriceReply(message: string): Promise<{
+  reply: string;
+  handles: CoffeeHandle[];
+} | null> {
+  const source = message.toLowerCase();
+
+  const isPriceIntent =
+    source.includes("precio") ||
+    source.includes("cuánto vale") ||
+    source.includes("cuanto vale") ||
+    source.includes("cuánto cuesta") ||
+    source.includes("cuanto cuesta") ||
+    source.includes("coste");
+
+  if (!isPriceIntent) return null;
+
+  const handles: CoffeeHandle[] = [];
+
+  if (source.includes("catuai")) handles.push("catuai");
+  if (source.includes("pacamara")) handles.push("pacamara");
+  if (source.includes("geisha")) handles.push("geisha");
+
+  const targetHandles = handles.length ? handles : ["catuai", "pacamara", "geisha"];
+
+  const products = await Promise.all(
+    targetHandles.map((handle) => getProductPricing(handle))
+  );
+
+  const lines: string[] = [];
+
+  lines.push("Estos son los precios actuales en Arte Coffee:");
+  lines.push("");
+
+  for (const product of products) {
+    lines.push(`${product.name}:`);
+
+    if (!product.variants.length) {
+      lines.push("- Precio no disponible ahora mismo.");
+      lines.push("");
+      continue;
+    }
+
+    product.variants
+      .sort((a, b) => a.bagSizeGrams - b.bagSizeGrams)
+      .forEach((variant) => {
+        lines.push(
+          `- ${formatBagSize(variant.bagSizeGrams)}: ${formatEuro(variant.priceB2C)}`
+        );
+      });
+
+    lines.push("");
+  }
+
+  lines.push(
+    "Si me dices cuántos cafés tomas al día, te recomiendo el formato o pack más eficiente para tu consumo."
+  );
+
+  return {
+    reply: lines.join("\n").trim(),
+    handles: targetHandles,
+  };
+}
+
 function parseBagSizeGrams(title: string): number {
   const normalized = title.toLowerCase().replace(/\s+/g, " ").trim();
 
