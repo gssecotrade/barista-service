@@ -790,6 +790,54 @@ function resolveProductsFromReply({
     .filter(Boolean) as ProductPayload[];
 }
 
+function resolvePackFromReply(message: string, reply: string): ProductPayload | null {
+  const source = `${message} ${reply}`.toLowerCase();
+
+  if (
+    source.includes("pack coffee lover") ||
+    (
+      source.includes("catuai") &&
+      source.includes("pacamara") &&
+      (
+        source.includes("tarde") ||
+        source.includes("sobremesa") ||
+        source.includes("fin de semana") ||
+        source.includes("especial") ||
+        source.includes("más carácter") ||
+        source.includes("mas carácter") ||
+        source.includes("mas caracter")
+      )
+    )
+  ) {
+    return {
+      handle: "pack-coffee-lover-seleccion-especial",
+      name: "Pack Coffee Lover - Selección especial - 1 kg",
+      reason: "Catuai como base diaria y Pacamara para momentos con más carácter.",
+      image: "",
+      url: "https://arte-coffee.com/products/pack-coffee-lover-seleccion-especial",
+    };
+  }
+
+  if (
+    source.includes("pack daily coffee") ||
+    source.includes("consumo diario") ||
+    source.includes("solución estable") ||
+    source.includes("solucion estable") ||
+    source.includes("una sola referencia") ||
+    source.includes("cubrir el mes")
+  ) {
+    return {
+      handle: "pack-daily-coffee-consumo-diario",
+      name: "Pack Daily Coffee - Consumo diario - 1 kg",
+      reason: "La opción más práctica para consumo diario constante.",
+      image: "",
+      url: "https://arte-coffee.com/products/pack-daily-coffee-consumo-diario",
+    };
+  }
+
+  return null;
+}
+
 function buildCommercialQuantityReply(message: string): string | null {
   if (!isMonthlyQuantityIntent(message)) return null;
 
