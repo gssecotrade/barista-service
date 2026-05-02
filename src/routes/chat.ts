@@ -15,6 +15,7 @@ import {
   buildProductPriceReply,
   extractAverageCupPrice,
   isCupEconomicsIntent,
+  getShopifyProductCommerceInfo,
 } from "../services/barista-pricing.service";
 import { runBaristaDecisionEngine } from "../services/barista-decision-engine.service";
 import { buildCommerceDecision } from "../services/barista-commerce-decision.service";
@@ -66,6 +67,9 @@ type ProductPayload = {
   reason: string;
   image: string;
   url: string;
+  price?: string;
+  composition?: string;
+  format?: string;
 };
 
 export async function chatRoutes(app: FastifyInstance) {
@@ -399,6 +403,17 @@ export async function chatRoutes(app: FastifyInstance) {
               userMessage: message,
             })
           : [];
+        
+      const resolvedProductsWithCommerce = await Promise.all(
+        resolvedProducts.map(async (product) => {
+          const commerceInfo = await getShopifyProductCommerceInfo(product.handle);
+
+          return {
+            ...product,
+            ...commerceInfo,
+          };
+        })
+      );
   
       const nextState = mergeBaristaState(mergedInputState, {
         activeCoffee: inferredCoffee,
@@ -439,7 +454,7 @@ export async function chatRoutes(app: FastifyInstance) {
             recipe: nextState.activeRecipe,
             drinkType: nextState.activeDrinkType,
             product: resolvedProducts[0] ?? null,
-            products: resolvedProducts,
+            products: resolvedProductsWithCommerce,
           },
         },
       });
@@ -492,9 +507,9 @@ export async function chatRoutes(app: FastifyInstance) {
         ok: true,
         reply: finalBaristaReply,
         intent: nextState.activeTopic ?? "general",
-        product: resolvedProducts[0] ?? null,
-        products: resolvedProducts,
-        primaryProduct: resolvedProducts[0] ?? null,
+        product: resolvedProductsWithCommerce[0] ?? null,
+        products: resolvedProductsWithCommerce,
+        primaryProduct: resolvedProductsWithCommerce[0] ?? null,
         state: nextState,
       });
     } catch (error) {

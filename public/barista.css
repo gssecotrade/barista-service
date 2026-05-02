@@ -715,3 +715,28 @@
   font-weight: 700;
   cursor: pointer;
 }
+
+.arte-card-commerce {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.arte-card-format {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  margin-bottom: 4px;
+}
+
+.arte-card-price {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.arte-card-composition {
+  font-size: 13px;
+  line-height: 1.35;
+  opacity: 0.78;
+}

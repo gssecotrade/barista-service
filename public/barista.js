@@ -362,6 +362,9 @@
     const safeUrl = escapeHtml(product.url || "#");
     const safeHandle = escapeHtml(product.handle || "");
     const safeCtaTitle = escapeHtml(getContextualCtaTitle(product));
+    const safePrice = escapeHtml(product.price || "");
+    const safeComposition = escapeHtml(product.composition || "");
+    const safeFormat = escapeHtml(product.format || "");
 
     const card = document.createElement("div");
     card.className = "arte-card arte-card--sales";
@@ -371,6 +374,17 @@
         <div class="arte-card-minimal-main">
           <div class="arte-card-kicker">${escapeHtml(getContextualCardLabel(product))}</div>
           <div class="arte-card-title">${safeName}</div>
+
+          ${
+            safePrice || safeFormat || safeComposition
+              ? `<div class="arte-card-commerce">`
+                  ${safeFormat ? `<div class="arte-card-format">${safeFormat}</div>` : ""}
+                  ${safePrice ? `<div class="arte-card-price">${safePrice}</div>` : ""}
+                  ${safeComposition ? `<div class="arte-card-composition">${safeComposition}</div>` : ""}
+                </div>`
+              : ""
+          }
+
           <div class="arte-card-chips">${buildProductChips(product)}</div>
         </div>
 
@@ -447,7 +461,7 @@
     });
 
     return container;
-  }
+}
   
   async function ensureSession(forceRefresh = false) {
     if (!forceRefresh && session) return session;

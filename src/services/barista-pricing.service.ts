@@ -820,3 +820,40 @@ function extractAverageCupPriceFromEngineContext(
 ): number | null {
   return null;
 }
+
+export async function getShopifyProductCommerceInfo(handle: string): Promise<{
+  price?: string;
+  format?: string;
+}> {
+  try {
+    const response = await fetch(`${SHOPIFY_BASE_URL}/products/${handle}.js`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+
+    if (!response.ok) return {};
+
+    const data = (await response.json()) as ShopifyProductJson;
+    const variants = Array.isArray(data.variants) ? data.variants : [];
+    const firstVariant = variants[0];
+
+    if (!firstVariant) return {};
+
+    const price = formatEuro(normalizePrice(firstVariant.price));
+
+    const titleSource = `${data.title || ""} ${firstVariant.title || ""}`.toLowerCase();
+
+    let format = "";
+    if (titleSource.includes("1 kg") || titleSource.includes("1000")) format = "1 kg";
+    else if (titleSource.includes("500")) format = "500 g";
+    else if (titleSource.includes("250")) format = "250 g";
+
+    return {
+      price,
+      format,
+    };
+  } catch (error) {
+    console.error(`Shopify commerce info failed for ${handle}:`, error);
+    return {};
+  }
+}
