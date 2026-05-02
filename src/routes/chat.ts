@@ -60,7 +60,7 @@ type BaristaTopic =
 type CoffeeHandle = "catuai" | "geisha" | "pacamara";
 
 type ProductPayload = {
-  handle: CoffeeHandle;
+  handle: string;
   name: string;
   reason: string;
   image: string;
@@ -378,18 +378,22 @@ export async function chatRoutes(app: FastifyInstance) {
               .filter(Boolean)
           : [];  
       
-     const resolvedProducts =
-      commerceProducts.length > 0
-        ? commerceProducts
-        : shouldShowProduct
-        ? resolveProductsFromReply({
-            reply: baristaReply,
-            fallbackCoffee: inferredCoffee,
-            topic: inferredTopic,
-            recipe: inferredRecipe,
-            userMessage: message,
-          })
-        : [];
+      const packProduct = resolvePackFromReply(message, finalBaristaReply);        
+     
+      const resolvedProducts =
+        packProduct
+          ? [packProduct]
+          : commerceProducts.length > 0
+          ? commerceProducts
+          : shouldShowProduct
+          ? resolveProductsFromReply({
+              reply: baristaReply,
+              fallbackCoffee: inferredCoffee,
+              topic: inferredTopic,
+              recipe: inferredRecipe,
+              userMessage: message,
+            })
+          : [];
   
       const nextState = mergeBaristaState(mergedInputState, {
         activeCoffee: inferredCoffee,
@@ -786,6 +790,41 @@ function resolveProductsFromReply({
     .filter(Boolean) as ProductPayload[];
 }
 
+function resolvePackFromReply(message: string, reply: string): ProductPayload | null {
+  const source = `${message} ${reply}`.toLowerCase();
+
+  if (
+    source.includes("pack coffee lover") ||
+    (source.includes("catuai") && source.includes("pacamara"))
+  ) {
+    return {
+      handle: "pack-coffee-lover-seleccion-especial",
+      name: "Pack Coffee Lover - Selección especial - 1 kg",
+      reason:
+        "La opción más lógica para una compra combinada: Catuai como base diaria y Pacamara como café con más carácter.",
+      image: "",
+      url: "https://arte-coffee.com/products/pack-coffee-lover-seleccion-especial",
+    };
+  }
+
+  if (
+    source.includes("pack daily coffee") ||
+    source.includes("2 bolsas de 500 g de catuai") ||
+    source.includes("consumo diario")
+  ) {
+    return {
+      handle: "pack-daily-coffee-consumo-diario",
+      name: "Pack Daily Coffee - Consumo diario - 1 kg",
+      reason:
+        "La opción más práctica para cubrir el consumo diario con una compra sencilla y mejor estructurada.",
+      image: "",
+      url: "https://arte-coffee.com/products/pack-daily-coffee-consumo-diario",
+    };
+  }
+
+  return null;
+}
+
 function containsAnyCoffeeMention(value: string): boolean {
   const normalized = value.toLowerCase();
   return (
@@ -935,10 +974,9 @@ function buildCommercialQuantityReply(message: string): string | null {
       if (hasAfterMealMoment) {
         return [
           "Recomendación mensual:",
-          "- 2 bolsas de 500 g de Catuai para el consumo diario",
-          "- 1 bolsa de 250 g de Pacamara para sobremesas y fines de semana",
+          "Para tu consumo mensual, la opción más lógica es el Pack Coffee Lover - Selección especial - 1 kg.",
           "",
-          "Tienes una base práctica para diario y una referencia con más estructura para los momentos más gastronómicos.",
+          "Te resuelve una compra combinada con Catuai como base diaria y Pacamara como café con más carácter para la tarde.",
         ].join("\n");
       }
 

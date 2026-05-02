@@ -441,42 +441,6 @@
     const container = document.createElement("div");
     container.className = "arte-card-list";
 
-    // 🔥 BOTÓN COMBINADO (solo si hay más de 1 producto)
-    if (unique.length > 1) {
-      const comboWrapper = document.createElement("div");
-      comboWrapper.className = "arte-combo-wrapper";
-
-      const comboButton = document.createElement("button");
-      comboButton.className = "arte-combo-button";
-      comboButton.innerText = "Añadir recomendación completa";
-
-      comboButton.onclick = async function () {
-        try {
-          comboButton.disabled = true;
-          comboButton.innerText = "Añadiendo...";
-
-          for (const product of unique.slice(0, 3)) {
-            await window.arteBaristaAddToCart(product.handle);
-          }
-
-          comboButton.innerText = "Añadido ✔";
-        } catch (e) {
-          comboButton.innerText = "Error";
-        } finally {
-          setTimeout(() => {
-            comboButton.disabled = false;
-            comboButton.innerText = "Añadir recomendación completa";
-          }, 2000);
-        }
-
-        return false;
-      };
-
-      comboWrapper.appendChild(comboButton);
-      container.appendChild(comboWrapper);
-    }
-
-    // productos individuales
     unique.slice(0, 3).forEach((product) => {
       const card = buildProductCard(product);
       if (card) container.appendChild(card);
