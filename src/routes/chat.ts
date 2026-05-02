@@ -306,10 +306,10 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const commerceReply = commerceDecision.handled ? commerceDecision.reply : null;
       
-      const baristaReply =
-        commerceReply ||    
-        forcedEconomicsReply ||
+      const baristaReply =   
         forcedCommercialReply ||
+        commerceReply ||
+        forcedEconomicsReply ||
         (forceStructuredAnswer ? null : engineResult?.reply) ||
         safeReply;
 
