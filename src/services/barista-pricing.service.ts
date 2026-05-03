@@ -340,10 +340,22 @@ async function getProductPricing(handle: CoffeeHandle): Promise<ProductPricingIn
     .filter(Boolean)
     .sort((a, b) => b.bagSizeGrams - a.bagSizeGrams) as ProductVariantInfo[];
 
+  const uniqueVariantsMap = new Map<number, ProductVariantInfo>();
+
+  variants.forEach((variant) => {
+    if (!uniqueVariantsMap.has(variant.bagSizeGrams)) {
+      uniqueVariantsMap.set(variant.bagSizeGrams, variant);
+    }
+  });
+
+  const uniqueVariants = Array.from(uniqueVariantsMap.values()).sort(
+    (a, b) => a.bagSizeGrams - b.bagSizeGrams
+  );
+
   return {
     handle,
     name: coffeeBusinessRules[handle].name,
-    variants,
+    variants: uniqueVariants,
     recommendedGramsPerCup: coffeeBusinessRules[handle].recommendedGramsPerCup,
   };
 }
@@ -456,8 +468,8 @@ function pickPreferredVariant(
     handle === "catuai"
       ? [1000, 500, 250]
       : handle === "pacamara"
-      ? [500, 250]
-      : [250];
+        ? [500, 250]
+        : [250];
 
   for (const grams of preferredOrder) {
     const match = variants.find((variant) => variant.bagSizeGrams === grams);
@@ -570,8 +582,8 @@ export function buildProfessionalEconomicsReply(
   const lines: string[] = [
     averageCupPrice !== null
       ? `Tomando como referencia tu precio medio actual de ${formatEuro(
-          averageCupPrice
-        )} por taza, esta sería la orientación por variedad:`
+        averageCupPrice
+      )} por taza, esta sería la orientación por variedad:`
       : "Análisis económico por variedad:",
     "",
   ];
@@ -628,10 +640,10 @@ export async function buildProfessionalPricingStrategyReply(params: {
       (coffees.length
         ? coffees
         : [
-            { handle: "catuai" as CoffeeHandle, percentage: 0.42, targetKg: 20.2, name: "Catuai" },
-            { handle: "pacamara" as CoffeeHandle, percentage: 0.33, targetKg: 15.8, name: "Pacamara" },
-            { handle: "geisha" as CoffeeHandle, percentage: 0.25, targetKg: 12.1, name: "Geisha" },
-          ]).map((coffee) => coffee.handle)
+          { handle: "catuai" as CoffeeHandle, percentage: 0.42, targetKg: 20.2, name: "Catuai" },
+          { handle: "pacamara" as CoffeeHandle, percentage: 0.33, targetKg: 15.8, name: "Pacamara" },
+          { handle: "geisha" as CoffeeHandle, percentage: 0.25, targetKg: 12.1, name: "Geisha" },
+        ]).map((coffee) => coffee.handle)
     )
   ) as CoffeeHandle[];
 
@@ -774,8 +786,8 @@ function computeWeightedB2BCostPerGram(coffee: {
         typeof item.priceB2B === "number"
           ? item.priceB2B
           : typeof item.priceB2C === "number"
-          ? item.priceB2C * B2B_DISCOUNT_FACTOR
-          : 0;
+            ? item.priceB2C * B2B_DISCOUNT_FACTOR
+            : 0;
 
       return sum + itemPriceB2B * item.quantity;
     }, 0);
