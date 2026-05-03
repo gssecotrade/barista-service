@@ -375,15 +375,13 @@
           <div class="arte-card-kicker">${escapeHtml(getContextualCardLabel(product))}</div>
           <div class="arte-card-title">${safeName}</div>
 
-          ${
-            safePrice || safeFormat || safeComposition
-              ? `<div class="arte-card-commerce">`
-                  ${safeFormat ? `<div class="arte-card-format">${safeFormat}</div>` : ""}
-                  ${safePrice ? `<div class="arte-card-price">${safePrice}</div>` : ""}
-                  ${safeComposition ? `<div class="arte-card-composition">${safeComposition}</div>` : ""}
-                </div>`
-              : ""
-          }
+          ${(safePrice || safeFormat || safeComposition) ? `
+            <div class="arte-card-commerce">
+              ${safeFormat ? `<div class="arte-card-format">${safeFormat}</div>` : ""}
+              ${safePrice ? `<div class="arte-card-price">${safePrice}</div>` : ""}
+              ${safeComposition ? `<div class="arte-card-composition">${safeComposition}</div>` : ""}
+            </div>
+          ` : ""}
 
           <div class="arte-card-chips">${buildProductChips(product)}</div>
         </div>
