@@ -50,7 +50,7 @@
   function saveSessionCache(value) {
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify(value));
-    } catch {}
+    } catch { }
   }
 
   function loadSessionCache() {
@@ -193,21 +193,24 @@
   }
 
   function renderWelcomeView(currentSession) {
-    const backendSummary =
+    const lastConversation =
       currentSession &&
-      currentSession.state &&
-      typeof currentSession.state.lastAssistantSummary === "string"
-        ? currentSession.state.lastAssistantSummary
+        currentSession.lastConversation &&
+        Array.isArray(currentSession.lastConversation.messages)
+        ? currentSession.lastConversation
+        : null;
+
+    const lastUserMessage =
+      lastConversation && lastConversation.lastUserMessage
+        ? String(lastConversation.lastUserMessage).trim()
         : "";
 
-    const localSummary = conversationState.lastSummary || "";
-    const summary = backendSummary || localSummary;
-
-    if (summary) {
+    if (lastUserMessage) {
       appendAssistantMessage(
-        `Bienvenido de nuevo.\n\n${summary}\n\n¿Quieres continuar con eso o prefieres una nueva consulta?`
+        `Bienvenido de nuevo.\n\nTu última consulta fue:\n“${lastUserMessage}”\n\n¿Quieres continuar esa conversación o empezar una nueva?`
       );
-      appendChoiceButtons();
+
+      appendChoiceButtons(lastConversation.messages);
       conversationState.isKnownUser = true;
       saveState();
       return;
@@ -281,13 +284,13 @@
         Array.isArray(productData?.products) && productData.products.length
           ? productData.products
           : Array.isArray(productData)
-          ? productData
-          : productData
-          ? [productData]
-          : [];
-    
+            ? productData
+            : productData
+              ? [productData]
+              : [];
+
       const cards = renderProductCards(productList);
-    
+
       if (cards) {
         wrapper.appendChild(cards);
       }
@@ -428,13 +431,13 @@
               },
             }),
           });
-        } catch {}
+        } catch { }
       });
     });
 
     return card;
   }
-  
+
   function renderProductCards(products) {
     if (!Array.isArray(products) || !products.length) return null;
 
@@ -459,8 +462,8 @@
     });
 
     return container;
-}
-  
+  }
+
   async function ensureSession(forceRefresh = false) {
     if (!forceRefresh && session) return session;
     if (!forceRefresh && sessionPromise) return sessionPromise;
@@ -645,110 +648,110 @@
   }
 
   async function sendMessage(message) {
-  try {
-    appendLoading();
+    try {
+      appendLoading();
 
-    const currentSession = await ensureSession();
-    const previousCoffee = conversationState.lastCoffee || "";
+      const currentSession = await ensureSession();
+      const previousCoffee = conversationState.lastCoffee || "";
 
-    const res = await fetch(`${API_BASE}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: currentSession.userId,
-        message,
-        context: {
-          lastCoffee: conversationState.lastCoffee || null,
-          lastIntent: conversationState.lastIntent || null,
-        },
-      }),
-    });
+      const res = await fetch(`${API_BASE}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentSession.userId,
+          message,
+          context: {
+            lastCoffee: conversationState.lastCoffee || null,
+            lastIntent: conversationState.lastIntent || null,
+          },
+        }),
+      });
 
-    if (!res.ok) {
-      let errorText = "";
-      try {
-        errorText = await res.text();
-      } catch {}
+      if (!res.ok) {
+        let errorText = "";
+        try {
+          errorText = await res.text();
+        } catch { }
 
-      console.error("BARISTA /chat HTTP ERROR", res.status, errorText);
+        console.error("BARISTA /chat HTTP ERROR", res.status, errorText);
 
+        removeLoading();
+        appendAssistantMessage(
+          "Ahora mismo no he podido procesar tu consulta. Escríbemela de nuevo en una frase y te respondo sin arrastrar contexto anterior."
+        );
+        return;
+      }
+
+      const data = await res.json();
+      removeLoading();
+
+      conversationState.hasStarted = true;
+      conversationState.isKnownUser = true;
+      conversationState.lastIntent = data.intent || "";
+      conversationState.lastSummary =
+        data.state && data.state.lastAssistantSummary
+          ? data.state.lastAssistantSummary
+          : conversationState.lastSummary || "";
+
+      let showProductCard = false;
+
+      const responseProducts =
+        Array.isArray(data.products) && data.products.length
+          ? data.products
+          : data.product
+            ? [data.product]
+            : [];
+
+      if (responseProducts.length) {
+        const firstProduct = responseProducts[0];
+        const newCoffee = firstProduct?.name || "";
+
+        showProductCard =
+          responseProducts.length > 1 ||
+          !previousCoffee ||
+          previousCoffee !== newCoffee;
+
+        if (newCoffee) {
+          conversationState.lastCoffee = newCoffee;
+        }
+      } else if (data.state?.activeCoffee) {
+        conversationState.lastCoffee = data.state.activeCoffee;
+      }
+
+      saveState();
+
+      if (session) {
+        session.profile = session.profile || {};
+        session.state = data.state || session.state || null;
+
+        saveSessionCache({
+          externalUserId,
+          userId: session.userId,
+          profile: session.profile,
+          state: session.state,
+          welcomeBack: true,
+          welcomeBackSummary: conversationState.lastSummary || "",
+        });
+      }
+
+      const forcedShowProductCard = responseProducts.length > 0;
+
+      appendAssistantMessage(
+        data.reply || "No he podido responder.",
+        responseProducts.length > 1
+          ? responseProducts
+          : responseProducts[0] || null,
+        forcedShowProductCard
+      );
+
+    } catch (error) {
+      console.error("BARISTA sendMessage ERROR", error);
       removeLoading();
       appendAssistantMessage(
         "Ahora mismo no he podido procesar tu consulta. Escríbemela de nuevo en una frase y te respondo sin arrastrar contexto anterior."
       );
-      return;
     }
-
-    const data = await res.json();
-    removeLoading();
-
-    conversationState.hasStarted = true;
-    conversationState.isKnownUser = true;
-    conversationState.lastIntent = data.intent || "";
-    conversationState.lastSummary =
-      data.state && data.state.lastAssistantSummary
-        ? data.state.lastAssistantSummary
-        : conversationState.lastSummary || "";
-
-    let showProductCard = false;
-
-    const responseProducts =
-      Array.isArray(data.products) && data.products.length
-        ? data.products
-        : data.product
-        ? [data.product]
-        : [];
-
-    if (responseProducts.length) {
-      const firstProduct = responseProducts[0];
-      const newCoffee = firstProduct?.name || "";
-
-      showProductCard =
-        responseProducts.length > 1 ||
-        !previousCoffee ||
-        previousCoffee !== newCoffee;
-
-      if (newCoffee) {
-        conversationState.lastCoffee = newCoffee;
-      }
-    } else if (data.state?.activeCoffee) {
-      conversationState.lastCoffee = data.state.activeCoffee;
-    }
-
-    saveState();
-
-    if (session) {
-      session.profile = session.profile || {};
-      session.state = data.state || session.state || null;
-
-      saveSessionCache({
-        externalUserId,
-        userId: session.userId,
-        profile: session.profile,
-        state: session.state,
-        welcomeBack: true,
-        welcomeBackSummary: conversationState.lastSummary || "",
-      });
-    }
-
-    const forcedShowProductCard = responseProducts.length > 0;
-
-    appendAssistantMessage(
-      data.reply || "No he podido responder.",
-      responseProducts.length > 1
-        ? responseProducts
-        : responseProducts[0] || null,
-      forcedShowProductCard
-    );
-
-  } catch (error) {
-    console.error("BARISTA sendMessage ERROR", error);
-    removeLoading();
-    appendAssistantMessage(
-      "Ahora mismo no he podido procesar tu consulta. Escríbemela de nuevo en una frase y te respondo sin arrastrar contexto anterior."
-    );
   }
-}
 
   async function init() {
     if (initialized) return;
@@ -757,7 +760,7 @@
 
     try {
       await ensureSession();
-    } catch {}
+    } catch { }
   }
 
   if (document.readyState === "loading") {
@@ -782,7 +785,7 @@
         el.style.outlineOffset = '4px';
       }
     }, 900);
-  } catch (e) {}
+  } catch (e) { }
 })();
 
 window.arteBaristaNavigate = function (handle) {
@@ -895,45 +898,45 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
 
     return false;
   }
-(function forceHideClubArteWhenBaristaIsOpen() {
-  let timer = null;
+  (function forceHideClubArteWhenBaristaIsOpen() {
+    let timer = null;
 
-  function hideClubArte() {
-    document.querySelectorAll("body *").forEach((el) => {
-      if (el.closest("#arte-barista-panel") || el.closest("#arte-barista-button")) return;
+    function hideClubArte() {
+      document.querySelectorAll("body *").forEach((el) => {
+        if (el.closest("#arte-barista-panel") || el.closest("#arte-barista-button")) return;
 
-      const text = (el.innerText || el.textContent || "").toLowerCase();
-      const rect = el.getBoundingClientRect();
+        const text = (el.innerText || el.textContent || "").toLowerCase();
+        const rect = el.getBoundingClientRect();
 
-      const isClubArteText = text.includes("club arte");
+        const isClubArteText = text.includes("club arte");
 
-      const isBlockingInput =
-        rect.right > window.innerWidth - 260 &&
-        rect.bottom > window.innerHeight - 170 &&
-        rect.width > 60 &&
-        rect.height > 35;
+        const isBlockingInput =
+          rect.right > window.innerWidth - 260 &&
+          rect.bottom > window.innerHeight - 170 &&
+          rect.width > 60 &&
+          rect.height > 35;
 
-      if (isClubArteText || isBlockingInput) {
-        el.style.setProperty("display", "none", "important");
-        el.style.setProperty("visibility", "hidden", "important");
-        el.style.setProperty("opacity", "0", "important");
-        el.style.setProperty("pointer-events", "none", "important");
-      }
-    });
-  }
+        if (isClubArteText || isBlockingInput) {
+          el.style.setProperty("display", "none", "important");
+          el.style.setProperty("visibility", "hidden", "important");
+          el.style.setProperty("opacity", "0", "important");
+          el.style.setProperty("pointer-events", "none", "important");
+        }
+      });
+    }
 
-  function startHideClubArte() {
-    hideClubArte();
-    if (timer) clearInterval(timer);
-    timer = setInterval(hideClubArte, 200);
-  }
+    function startHideClubArte() {
+      hideClubArte();
+      if (timer) clearInterval(timer);
+      timer = setInterval(hideClubArte, 200);
+    }
 
-  function stopHideClubArte() {
-    if (timer) clearInterval(timer);
-    timer = null;
-  }
+    function stopHideClubArte() {
+      if (timer) clearInterval(timer);
+      timer = null;
+    }
 
-  window.arteStartHideClubArte = startHideClubArte;
-  window.arteStopHideClubArte = stopHideClubArte;
-})();
+    window.arteStartHideClubArte = startHideClubArte;
+    window.arteStopHideClubArte = stopHideClubArte;
+  })();
 };
