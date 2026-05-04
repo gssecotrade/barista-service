@@ -242,7 +242,10 @@
 
         if (choice === "continue") {
           appendUserMessage("Continuar conversación");
-          await sendMessage("Quiero continuar con la conversación anterior");
+          await sendMessage(
+            lastConversation?.lastUserMessage ||
+            "Quiero continuar con la conversación anterior"
+          );
         } else {
           conversationState.lastSummary = "";
           conversationState.lastIntent = "";
@@ -741,7 +744,7 @@
         responseProducts.length > 1
           ? responseProducts
           : responseProducts[0] || null,
-        forcedShowProductCard
+        showProductCard
       );
 
     } catch (error) {
@@ -898,7 +901,9 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
 
     return false;
   }
-  (function forceHideClubArteWhenBaristaIsOpen() {
+  
+};
+(function forceHideClubArteWhenBaristaIsOpen() {
     let timer = null;
 
     function hideClubArte() {
@@ -939,4 +944,3 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
     window.arteStartHideClubArte = startHideClubArte;
     window.arteStopHideClubArte = stopHideClubArte;
   })();
-};
