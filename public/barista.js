@@ -158,8 +158,7 @@
     panel.style.display = "flex";
     panel.style.zIndex = "2147483647";
 
-    if (window.arteStartHideClubArte) {
-      window.arteStartHideClubArte();
+    document.body.classList.add("barista-open");
     }
 
     clearVisibleChat();
@@ -180,8 +179,7 @@
     const panel = document.getElementById("arte-barista-panel");
     panel.style.display = "none";
 
-    if (window.arteStopHideClubArte) {
-      window.arteStopHideClubArte();
+    document.body.classList.remove("barista-open");
     }
 
     clearVisibleChat();
@@ -903,44 +901,3 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
   }
   
 };
-(function forceHideClubArteWhenBaristaIsOpen() {
-    let timer = null;
-
-    function hideClubArte() {
-      document.querySelectorAll("body *").forEach((el) => {
-        if (el.closest("#arte-barista-panel") || el.closest("#arte-barista-button")) return;
-
-        const text = (el.innerText || el.textContent || "").toLowerCase();
-        const rect = el.getBoundingClientRect();
-
-        const isClubArteText = text.includes("club arte");
-
-        const isBlockingInput =
-          rect.right > window.innerWidth - 260 &&
-          rect.bottom > window.innerHeight - 170 &&
-          rect.width > 60 &&
-          rect.height > 35;
-
-        if (isClubArteText || isBlockingInput) {
-          el.style.setProperty("display", "none", "important");
-          el.style.setProperty("visibility", "hidden", "important");
-          el.style.setProperty("opacity", "0", "important");
-          el.style.setProperty("pointer-events", "none", "important");
-        }
-      });
-    }
-
-    function startHideClubArte() {
-      hideClubArte();
-      if (timer) clearInterval(timer);
-      timer = setInterval(hideClubArte, 200);
-    }
-
-    function stopHideClubArte() {
-      if (timer) clearInterval(timer);
-      timer = null;
-    }
-
-    window.arteStartHideClubArte = startHideClubArte;
-    window.arteStopHideClubArte = stopHideClubArte;
-  })();
