@@ -350,7 +350,14 @@ export async function chatRoutes(app: FastifyInstance) {
         mergedInputState.activeRecipe ??
         null;
 
+      const hasPendingQuestion =
+        Boolean(commerceDecision.pendingQuestion) ||
+        finalBaristaReply.includes("¿cómo preparas") ||
+        finalBaristaReply.includes("necesito un dato") ||
+        finalBaristaReply.includes("para afinar");
+
       const shouldShowProduct =
+        !hasPendingQuestion &&
         shouldReturnProduct({
           message,
           reply: finalBaristaReply,

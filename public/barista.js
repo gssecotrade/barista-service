@@ -215,7 +215,11 @@
         ? String(lastConversation.lastUserMessage).trim()
         : "";
 
-    if (lastUserMessage) {
+    const isWeakLastMessage =
+      lastUserMessage.length < 18 ||
+      ["espresso", "filtro", "italiana", "automática", "automatica", "sí", "si", "no"].includes(lastUserMessage.toLowerCase());
+
+    if (lastUserMessage && !isWeakLastMessage) {
       appendAssistantMessage(
         `Bienvenido de nuevo.\n\nTu última consulta fue:\n“${lastUserMessage}”\n\n¿Quieres continuar esa conversación o empezar una nueva?`
       );
