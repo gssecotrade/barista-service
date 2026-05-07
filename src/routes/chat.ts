@@ -408,30 +408,33 @@ export async function chatRoutes(app: FastifyInstance) {
       const packProduct = resolvePackFromReply(message, finalBaristaReply);
 
       const shouldForceCommercialProduct =
-        Boolean(forcedCommercialReply) || isMonthlyQuantityIntent(message);
+        !hasPendingQuestion &&
+        (Boolean(forcedCommercialReply) || isMonthlyQuantityIntent(commercialQuantitySource));
 
       const resolvedProducts =
-        packProduct
-          ? [packProduct]
-          : commerceProducts.length > 0
-            ? commerceProducts
-            : shouldForceCommercialProduct
-              ? resolveProductsFromReply({
-                reply: finalBaristaReply,
-                fallbackCoffee: inferredCoffee,
-                topic: inferredTopic,
-                recipe: inferredRecipe,
-                userMessage: message,
-              })
-              : shouldShowProduct
+        hasPendingQuestion
+          ? []
+          : packProduct
+            ? [packProduct]
+            : commerceProducts.length > 0
+              ? commerceProducts
+              : shouldForceCommercialProduct
                 ? resolveProductsFromReply({
                   reply: finalBaristaReply,
                   fallbackCoffee: inferredCoffee,
                   topic: inferredTopic,
                   recipe: inferredRecipe,
-                  userMessage: message,
+                  userMessage: commercialQuantitySource,
                 })
-                : [];
+                : shouldShowProduct
+                  ? resolveProductsFromReply({
+                    reply: finalBaristaReply,
+                    fallbackCoffee: inferredCoffee,
+                    topic: inferredTopic,
+                    recipe: inferredRecipe,
+                    userMessage: message,
+                  })
+                  : [];
 
       const resolvedProductsWithCommerce = await Promise.all(
         resolvedProducts.map(async (product) => {
