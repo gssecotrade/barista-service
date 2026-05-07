@@ -447,6 +447,16 @@ export async function chatRoutes(app: FastifyInstance) {
         })
       );
 
+      const hasPendingQuestion =
+        !!commerceDecision.pendingQuestion ||
+        finalBaristaReply.includes("¿") ||
+        finalBaristaReply.toLowerCase().includes("necesito un dato") ||
+        finalBaristaReply.toLowerCase().includes("para afinar");
+
+      const finalProductsWithCommerce = hasPendingQuestion
+        ? []
+        : resolvedProductsWithCommerce;
+
       const nextState = mergeBaristaState(mergedInputState, {
         activeCoffee: inferredCoffee,
         activeTopic: inferredTopic,
@@ -486,7 +496,7 @@ export async function chatRoutes(app: FastifyInstance) {
             recipe: nextState.activeRecipe,
             drinkType: nextState.activeDrinkType,
             product: resolvedProducts[0] ?? null,
-            products: resolvedProductsWithCommerce,
+            products: finalProductsWithCommerce,
           },
         },
       });
@@ -539,9 +549,9 @@ export async function chatRoutes(app: FastifyInstance) {
         ok: true,
         reply: finalBaristaReply,
         intent: nextState.activeTopic ?? "general",
-        product: resolvedProductsWithCommerce[0] ?? null,
-        products: resolvedProductsWithCommerce,
-        primaryProduct: resolvedProductsWithCommerce[0] ?? null,
+        product: finalProductsWithCommerce[0] ?? null,
+        products: finalProductsWithCommerce,
+        primaryProduct: finalProductsWithCommerce[0] ?? null,
         state: nextState,
       });
     } catch (error) {
