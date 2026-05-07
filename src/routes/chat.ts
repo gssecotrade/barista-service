@@ -76,18 +76,18 @@ export async function chatRoutes(app: FastifyInstance) {
   app.post("/chat", async (request, reply) => {
     try {
       const parsed = chatBodySchema.safeParse(request.body);
-  
+
       if (!parsed.success) {
         return reply.status(400).send({
           error: "invalid_body",
           details: parsed.error.flatten(),
         });
       }
-  
+
       const { userId, message, context } = parsed.data;
 
       console.log("CHAT USER", { userId, message });
-  
+
       let user = null;
 
       try {
@@ -116,11 +116,11 @@ export async function chatRoutes(app: FastifyInstance) {
           error: "user_not_found",
         });
       }
-  
+
       const dbState = normalizeBaristaState(
         (user.profile?.state as Record<string, unknown> | null) ?? EMPTY_BARISTA_STATE
       );
-  
+
       const mergedInputState = normalizeBaristaState({
         ...dbState,
         activeCoffee:
@@ -130,7 +130,7 @@ export async function chatRoutes(app: FastifyInstance) {
           dbState.activeTopic ??
           mapIntentToTopic(context?.lastIntent ?? null),
       });
-  
+
       const history = user.messages
         .slice()
         .reverse()
@@ -138,7 +138,7 @@ export async function chatRoutes(app: FastifyInstance) {
           role: msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         }));
-  
+
       await prisma.baristaMessage.create({
         data: {
           userId,
@@ -151,7 +151,7 @@ export async function chatRoutes(app: FastifyInstance) {
       });
 
       const commerceDecision = buildCommerceDecision(message);
-  
+
       const isPricingIntent = isCupEconomicsIntent(message);
 
       const looksProfessional =
@@ -174,28 +174,28 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const { reply: rawBaristaReply, updatedContext } = forceStructuredAnswer
         ? {
-            reply: "",
-            updatedContext: {
-              lastCoffee: mergedInputState.activeCoffee ?? undefined,
-              lastIntent: mergedInputState.activeTopic ?? undefined,
-              lastStyle: mergedInputState.activeDrinkType ?? undefined,
-              summary:
-                mergedInputState.lastAssistantSummary ??
-                buildFriendlySummary(mergedInputState),
-            },
-          }
+          reply: "",
+          updatedContext: {
+            lastCoffee: mergedInputState.activeCoffee ?? undefined,
+            lastIntent: mergedInputState.activeTopic ?? undefined,
+            lastStyle: mergedInputState.activeDrinkType ?? undefined,
+            summary:
+              mergedInputState.lastAssistantSummary ??
+              buildFriendlySummary(mergedInputState),
+          },
+        }
         : await generateBaristaResponse({
-            userMessage: message,
-            history,
-            context: {
-              lastCoffee: mergedInputState.activeCoffee ?? undefined,
-              lastIntent: mergedInputState.activeTopic ?? undefined,
-              lastStyle: mergedInputState.activeDrinkType ?? undefined,
-              summary:
-                mergedInputState.lastAssistantSummary ??
-                buildFriendlySummary(mergedInputState),
-            },
-          });
+          userMessage: message,
+          history,
+          context: {
+            lastCoffee: mergedInputState.activeCoffee ?? undefined,
+            lastIntent: mergedInputState.activeTopic ?? undefined,
+            lastStyle: mergedInputState.activeDrinkType ?? undefined,
+            summary:
+              mergedInputState.lastAssistantSummary ??
+              buildFriendlySummary(mergedInputState),
+          },
+        });
 
       const engineResult = forceStructuredAnswer
         ? null
@@ -209,48 +209,48 @@ export async function chatRoutes(app: FastifyInstance) {
       const stateProfessionalPlan =
         isObject((mergedInputState as Record<string, unknown>).lastProfessionalPlan)
           ? ((mergedInputState as Record<string, unknown>).lastProfessionalPlan as {
-              coffeesPerDay?: number | null;
-              days?: number | null;
-              coffees?: Array<{
-                handle: CoffeeHandle;
-                name: string;
-                percentage: number;
-                targetKg: number;
-                totalB2B?: number;
-                roundedTargetGrams?: number;
-                formatBreakdown?: Array<{
-                  variantId?: number | string | null;
-                  bagSizeGrams: number;
-                  quantity: number;
-                  priceB2B?: number;
-                  priceB2C?: number;
-                }>;
+            coffeesPerDay?: number | null;
+            days?: number | null;
+            coffees?: Array<{
+              handle: CoffeeHandle;
+              name: string;
+              percentage: number;
+              targetKg: number;
+              totalB2B?: number;
+              roundedTargetGrams?: number;
+              formatBreakdown?: Array<{
+                variantId?: number | string | null;
+                bagSizeGrams: number;
+                quantity: number;
+                priceB2B?: number;
+                priceB2C?: number;
               }>;
-            })
+            }>;
+          })
           : null;
 
       const preferencesProfessionalPlan =
         isObject(user.profile?.preferences) &&
-        isObject((user.profile?.preferences as Record<string, unknown>).lastProfessionalPlan)
+          isObject((user.profile?.preferences as Record<string, unknown>).lastProfessionalPlan)
           ? ((user.profile?.preferences as Record<string, unknown>).lastProfessionalPlan as {
-              coffeesPerDay?: number | null;
-              days?: number | null;
-              coffees?: Array<{
-                handle: CoffeeHandle;
-                name: string;
-                percentage: number;
-                targetKg: number;
-                totalB2B?: number;
-                roundedTargetGrams?: number;
-                formatBreakdown?: Array<{
-                  variantId?: number | string | null;
-                  bagSizeGrams: number;
-                  quantity: number;
-                  priceB2B?: number;
-                  priceB2C?: number;
-                }>;
+            coffeesPerDay?: number | null;
+            days?: number | null;
+            coffees?: Array<{
+              handle: CoffeeHandle;
+              name: string;
+              percentage: number;
+              targetKg: number;
+              totalB2B?: number;
+              roundedTargetGrams?: number;
+              formatBreakdown?: Array<{
+                variantId?: number | string | null;
+                bagSizeGrams: number;
+                quantity: number;
+                priceB2B?: number;
+                priceB2C?: number;
               }>;
-            })
+            }>;
+          })
           : null;
 
       const lastProfessionalPlan =
@@ -259,17 +259,17 @@ export async function chatRoutes(app: FastifyInstance) {
       const pricingContext =
         engineResult?.type === "professional_volume"
           ? {
-              coffeesPerDay: engineResult.meta?.coffeesPerDay ?? null,
-              days: engineResult.meta?.days ?? null,
-              coffees: engineResult.mix?.lines ?? [],
-            }
+            coffeesPerDay: engineResult.meta?.coffeesPerDay ?? null,
+            days: engineResult.meta?.days ?? null,
+            coffees: engineResult.mix?.lines ?? [],
+          }
           : lastProfessionalPlan
-          ? {
+            ? {
               coffeesPerDay: lastProfessionalPlan.coffeesPerDay ?? null,
               days: lastProfessionalPlan.days ?? null,
               coffees: lastProfessionalPlan.coffees ?? [],
             }
-          : null;
+            : null;
 
       console.log("PRICING ROUTE CHECK", {
         message,
@@ -287,24 +287,24 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const forcedPriceResult = await buildProductPriceReply(message);
       const forcedPriceReply = forcedPriceResult?.reply ?? null;
-      
+
       const forcedEconomicsReply = isPricingIntent
         ? looksProfessional
           ? await buildProfessionalPricingStrategyReply({
-              currentPricePerCup: averageCupPrice ?? 2.3,
-              message,
-              context: pricingContext
-                ? {
-                    coffeesPerDay: pricingContext.coffeesPerDay ?? null,
-                    days: pricingContext.days ?? null,
-                  }
-                : null,
-              coffees:
-                Array.isArray(pricingContext?.coffees) &&
+            currentPricePerCup: averageCupPrice ?? 2.3,
+            message,
+            context: pricingContext
+              ? {
+                coffeesPerDay: pricingContext.coffeesPerDay ?? null,
+                days: pricingContext.days ?? null,
+              }
+              : null,
+            coffees:
+              Array.isArray(pricingContext?.coffees) &&
                 pricingContext?.coffees && pricingContext.coffees.length > 0
-                  ? pricingContext.coffees
-                  : [],
-            })
+                ? pricingContext.coffees
+                : [],
+          })
           : await buildCupEconomicsReply({ message })
         : null;
 
@@ -313,49 +313,44 @@ export async function chatRoutes(app: FastifyInstance) {
         : sanitizeForbiddenContent(rawBaristaReply);
 
       const commerceReply = commerceDecision.handled ? commerceDecision.reply : null;
-      
-      const baristaReply =   
-        forcedPriceReply ||
-        forcedCommercialReply ||
+
+      const baristaReply =
         commerceReply ||
+        forcedCommercialReply ||
+        forcedPriceReply ||
         forcedEconomicsReply ||
-        (forceStructuredAnswer ? null : engineResult?.reply) ||
-        safeReply;
+        forcedStructuredAnswer ||
+        engineResult?.reply ||
+        rawBaristaReply;
 
       let finalBaristaReply = baristaReply;
 
       if (shouldMentionClubArte(message)) {
         finalBaristaReply +=
           "\n\nSi quieres, te explico de forma breve las ventajas de Club Arte.";
-      } else if (
-        !looksProfessional &&
-        isMonthlyQuantityIntent(message)
-      ) {
-        finalBaristaReply +=
-          "\n\nSi quieres, te preparo ahora mismo la combinación más lógica para comprar en web o dejarla resuelta en suscripción.";
       }
-  
+
       const inferredCoffee =
         inferCoffeeFromText(`${message} ${finalBaristaReply}`) ??
         normalizeCoffeeValue(updatedContext?.lastCoffee ?? null) ??
         mergedInputState.activeCoffee ??
         null;
-  
+
       const inferredTopic =
         inferTopicFromText(`${message} ${finalBaristaReply}`) ??
         mergedInputState.activeTopic ??
         "general";
-  
+
       const inferredDrinkType =
         inferDrinkTypeFromText(`${message} ${finalBaristaReply}`) ??
         mergedInputState.activeDrinkType ??
         null;
-  
+
       const inferredRecipe =
         inferRecipeFromText(`${message} ${finalBaristaReply}`) ??
         mergedInputState.activeRecipe ??
         null;
-  
+
       const shouldShowProduct =
         shouldReturnProduct({
           message,
@@ -372,38 +367,49 @@ export async function chatRoutes(app: FastifyInstance) {
           reply: finalBaristaReply,
         }) &&
         !suppressProductCardsForProfessionalVolume;
-  
+
       const commerceProducts =
         commerceDecision.products.length > 0
           ? commerceDecision.products
-              .map((handle) =>
-                mapCoffeeToProduct(handle, {
-                  topic: "coffee_selection",
-                  recipe: null,
-                  userMessage: message,
-                  reply: baristaReply,
-                })
-              )
-              .filter(Boolean)
-          : [];  
-      
-      const packProduct = resolvePackFromReply(message, finalBaristaReply);        
-     
+            .map((handle) =>
+              mapCoffeeToProduct(handle, {
+                topic: "coffee_selection",
+                recipe: null,
+                userMessage: message,
+                reply: baristaReply,
+              })
+            )
+            .filter(Boolean)
+          : [];
+
+      const packProduct = resolvePackFromReply(message, finalBaristaReply);
+
+      const shouldForceCommercialProduct =
+        Boolean(forcedCommercialReply) || isMonthlyQuantityIntent(message);
+
       const resolvedProducts =
         packProduct
           ? [packProduct]
           : commerceProducts.length > 0
-          ? commerceProducts
-          : shouldShowProduct
-          ? resolveProductsFromReply({
-              reply: baristaReply,
-              fallbackCoffee: inferredCoffee,
-              topic: inferredTopic,
-              recipe: inferredRecipe,
-              userMessage: message,
-            })
-          : [];
-        
+            ? commerceProducts
+            : shouldForceCommercialProduct
+              ? resolveProductsFromReply({
+                reply: finalBaristaReply,
+                fallbackCoffee: inferredCoffee,
+                topic: inferredTopic,
+                recipe: inferredRecipe,
+                userMessage: message,
+              })
+              : shouldShowProduct
+                ? resolveProductsFromReply({
+                  reply: finalBaristaReply,
+                  fallbackCoffee: inferredCoffee,
+                  topic: inferredTopic,
+                  recipe: inferredRecipe,
+                  userMessage: message,
+                })
+                : [];
+
       const resolvedProductsWithCommerce = await Promise.all(
         resolvedProducts.map(async (product) => {
           const commerceInfo = await getShopifyProductCommerceInfo(product.handle);
@@ -414,7 +420,7 @@ export async function chatRoutes(app: FastifyInstance) {
           };
         })
       );
-  
+
       const nextState = mergeBaristaState(mergedInputState, {
         activeCoffee: inferredCoffee,
         activeTopic: inferredTopic,
@@ -436,13 +442,13 @@ export async function chatRoutes(app: FastifyInstance) {
         lastProfessionalPlan:
           engineResult?.type === "professional_volume"
             ? {
-                coffeesPerDay: engineResult.meta?.coffeesPerDay ?? null,
-                days: engineResult.meta?.days ?? null,
-                coffees: engineResult.mix?.lines ?? [],
-              }
+              coffeesPerDay: engineResult.meta?.coffeesPerDay ?? null,
+              days: engineResult.meta?.days ?? null,
+              coffees: engineResult.mix?.lines ?? [],
+            }
             : lastProfessionalPlan,
       });
-  
+
       await prisma.baristaMessage.create({
         data: {
           userId,
@@ -458,7 +464,7 @@ export async function chatRoutes(app: FastifyInstance) {
           },
         },
       });
-  
+
       if (user.profile) {
         await prisma.baristaProfile.update({
           where: { id: user.profile.id },
@@ -477,7 +483,7 @@ export async function chatRoutes(app: FastifyInstance) {
               lastUserGoal: nextState.lastUserGoal,
               lastAssistantSummary: nextState.lastAssistantSummary,
               conversationMode: nextState.conversationMode,
-              lastProfessionalPlan: nextState.lastProfessionalPlan ?? null,          
+              lastProfessionalPlan: nextState.lastProfessionalPlan ?? null,
             },
             state: nextState,
           },
@@ -502,7 +508,7 @@ export async function chatRoutes(app: FastifyInstance) {
           },
         });
       }
-  
+
       return reply.send({
         ok: true,
         reply: finalBaristaReply,
