@@ -25,9 +25,7 @@
 
   function getOrCreateExternalUserId() {
     const existing = localStorage.getItem(USER_KEY);
-    if (existing && typeof existing === "string" && existing.trim()) {
-      return existing;
-    }
+    if (existing && typeof existing === "string" && existing.trim()) return existing;
 
     const created = "arte-" + Math.random().toString(36).slice(2, 12);
     localStorage.setItem(USER_KEY, created);
@@ -50,7 +48,7 @@
   function saveSessionCache(value) {
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify(value));
-    } catch { }
+    } catch {}
   }
 
   function loadSessionCache() {
@@ -94,11 +92,7 @@
       <div id="arte-barista-messages"></div>
       <div id="arte-barista-input-wrap">
         <div id="arte-barista-input-shell">
-          <textarea
-            id="arte-barista-input"
-            rows="1"
-            placeholder="Escribe tu consulta…"
-          ></textarea>
+          <textarea id="arte-barista-input" rows="1" placeholder="Escribe tu consulta…"></textarea>
           <button id="arte-barista-send" type="button" aria-label="Enviar consulta">→</button>
         </div>
       </div>
@@ -159,10 +153,8 @@
     panel.style.zIndex = "2147483647";
 
     document.body.classList.add("barista-open");
-    }
 
     clearVisibleChat();
-
     appendLoading("Recuperando conversación...");
 
     try {
@@ -180,7 +172,6 @@
     panel.style.display = "none";
 
     document.body.classList.remove("barista-open");
-    }
 
     clearVisibleChat();
   }
@@ -193,8 +184,8 @@
   function renderWelcomeView(currentSession) {
     const lastConversation =
       currentSession &&
-        currentSession.lastConversation &&
-        Array.isArray(currentSession.lastConversation.messages)
+      currentSession.lastConversation &&
+      Array.isArray(currentSession.lastConversation.messages)
         ? currentSession.lastConversation
         : null;
 
@@ -208,7 +199,7 @@
         `Bienvenido de nuevo.\n\nTu última consulta fue:\n“${lastUserMessage}”\n\n¿Quieres continuar esa conversación o empezar una nueva?`
       );
 
-      appendChoiceButtons(lastConversation.messages);
+      appendChoiceButtons(lastConversation);
       conversationState.isKnownUser = true;
       saveState();
       return;
@@ -221,7 +212,7 @@
     }
   }
 
-  function appendChoiceButtons() {
+  function appendChoiceButtons(lastConversation) {
     const wrapper = document.createElement("div");
     wrapper.className = "arte-msg arte-msg-assistant";
 
@@ -242,13 +233,14 @@
           appendUserMessage("Continuar conversación");
           await sendMessage(
             lastConversation?.lastUserMessage ||
-            "Quiero continuar con la conversación anterior"
+              "Quiero continuar con la conversación anterior"
           );
         } else {
           conversationState.lastSummary = "";
           conversationState.lastIntent = "";
           conversationState.lastCoffee = "";
           saveState();
+
           appendUserMessage("Nueva consulta");
           appendAssistantMessage(
             "Perfecto. Empezamos de nuevo.\n\n¿Qué te apetece resolver hoy?"
@@ -291,10 +283,7 @@
               : [];
 
       const cards = renderProductCards(productList);
-
-      if (cards) {
-        wrapper.appendChild(cards);
-      }
+      if (cards) wrapper.appendChild(cards);
     }
 
     messagesEl().appendChild(wrapper);
@@ -352,6 +341,8 @@
       catuai: ["Suave", "Equilibrado", "Versátil"],
       geisha: ["Floral", "Elegante", "Aromático"],
       pacamara: ["Intenso", "Con cuerpo", "Complejo"],
+      "pack-daily-coffee-consumo-diario": ["Diario", "1 kg", "Optimizado"],
+      "pack-coffee-lover-seleccion-especial": ["Selección", "1 kg", "Pack"],
     };
 
     return (map[product.handle] || [])
@@ -379,13 +370,17 @@
           <div class="arte-card-kicker">${escapeHtml(getContextualCardLabel(product))}</div>
           <div class="arte-card-title">${safeName}</div>
 
-          ${(safePrice || safeFormat || safeComposition) ? `
+          ${
+            safePrice || safeFormat || safeComposition
+              ? `
             <div class="arte-card-commerce">
               ${safeFormat ? `<div class="arte-card-format">${safeFormat}</div>` : ""}
               ${safePrice ? `<div class="arte-card-price">${safePrice}</div>` : ""}
               ${safeComposition ? `<div class="arte-card-composition">${safeComposition}</div>` : ""}
             </div>
-          ` : ""}
+          `
+              : ""
+          }
 
           <div class="arte-card-chips">${buildProductChips(product)}</div>
         </div>
@@ -432,7 +427,7 @@
               },
             }),
           });
-        } catch { }
+        } catch {}
       });
     });
 
@@ -501,150 +496,14 @@
     return sessionPromise;
   }
 
-  function getIntentLabel(intent) {
-    if (!intent) return null;
-
-    const normalized = String(intent).toLowerCase();
-
-    if (normalized.includes("pair")) return "maridaje";
-    if (normalized.includes("recipe")) return "receta";
-    if (normalized.includes("cocktail")) return "cóctel";
-    if (normalized.includes("mocktail")) return "propuesta sin alcohol";
-    if (normalized.includes("order")) return "compra";
-    if (normalized.includes("subscription")) return "suscripción";
-    if (normalized.includes("professional")) return "propuesta para tu local";
-    if (normalized.includes("select")) return "recomendación de café";
-    if (normalized.includes("prepar")) return "forma de preparación";
-
-    return "recomendación";
-  }
-
-  function prettyCoffeeName(coffee) {
-    if (!coffee) return null;
-
-    const normalized = String(coffee).toLowerCase();
-
-    if (normalized.includes("catuai")) return "Catuai";
-    if (normalized.includes("geisha")) return "Geisha";
-    if (normalized.includes("pacamara")) return "Pacamara";
-
-    return coffee;
-  }
-
-  function getSmartFallbackMessage() {
-    return "Ahora mismo no he podido procesar tu consulta. Escríbemela de nuevo en una frase y te respondo sin arrastrar contexto anterior.";
-  }
-
-  function getContextualCtaLabel(product) {
-    const lastIntent = String(conversationState?.lastIntent || "").toLowerCase();
-    const lastCoffee = String(conversationState?.lastCoffee || "").toLowerCase();
-    const handle = String(product?.handle || "").toLowerCase();
-
-    if (
-      lastIntent.includes("professional") ||
-      lastIntent.includes("local") ||
-      lastIntent.includes("negocio") ||
-      lastIntent.includes("carta")
-    ) {
-      return "Café recomendado";
-    }
-
-    if (
-      lastIntent.includes("pair") ||
-      lastIntent.includes("marid") ||
-      lastIntent.includes("postre") ||
-      lastIntent.includes("recipe") ||
-      lastIntent.includes("receta")
-    ) {
-      return "Café recomendado";
-    }
-
-    if (
-      lastIntent.includes("cocktail") ||
-      lastIntent.includes("mocktail") ||
-      lastIntent.includes("sin alcohol")
-    ) {
-      return "Café recomendado";
-    }
-
-    if (
-      lastIntent.includes("order") ||
-      lastIntent.includes("compra") ||
-      lastIntent.includes("subscription")
-    ) {
-      return "Café recomendado";
-    }
-
-    if (handle && lastCoffee && handle.includes(lastCoffee)) {
-      return "Café recomendado";
-    }
-
-    return "Café recomendado";
-  }
-
   function getContextualCtaTitle(product) {
-    const lastIntent = String(conversationState?.lastIntent || "").toLowerCase();
-
-    if (
-      lastIntent.includes("professional") ||
-      lastIntent.includes("local") ||
-      lastIntent.includes("negocio") ||
-      lastIntent.includes("carta")
-    ) {
-      return "Café recomendado recomendado para esta propuesta de carta";
-    }
-
-    if (
-      lastIntent.includes("pair") ||
-      lastIntent.includes("marid") ||
-      lastIntent.includes("postre") ||
-      lastIntent.includes("recipe") ||
-      lastIntent.includes("receta")
-    ) {
-      return "Café recomendado para este maridaje o receta";
-    }
-
-    if (
-      lastIntent.includes("cocktail") ||
-      lastIntent.includes("mocktail") ||
-      lastIntent.includes("sin alcohol")
-    ) {
-      return "Café recomendado recomendado para esta elaboración";
-    }
-
-    return "Café recomendado";
+    return `Ver ${product?.name || "producto recomendado"}`;
   }
 
   function getContextualCardLabel(product) {
-    const lastIntent = String(conversationState?.lastIntent || "").toLowerCase();
+    const handle = String(product?.handle || "").toLowerCase();
 
-    if (
-      lastIntent.includes("professional") ||
-      lastIntent.includes("local") ||
-      lastIntent.includes("negocio") ||
-      lastIntent.includes("carta")
-    ) {
-      return "Café recomendado para carta";
-    }
-
-    if (
-      lastIntent.includes("pair") ||
-      lastIntent.includes("marid") ||
-      lastIntent.includes("postre") ||
-      lastIntent.includes("recipe") ||
-      lastIntent.includes("receta")
-    ) {
-      return "Café recomendado para esta propuesta";
-    }
-
-    if (
-      lastIntent.includes("cocktail") ||
-      lastIntent.includes("mocktail") ||
-      lastIntent.includes("sin alcohol")
-    ) {
-      return "Base recomendada";
-    }
-
+    if (handle.includes("pack")) return "Pack recomendado";
     return "Café sugerido";
   }
 
@@ -672,14 +531,11 @@
         let errorText = "";
         try {
           errorText = await res.text();
-        } catch { }
+        } catch {}
 
         console.error("BARISTA /chat HTTP ERROR", res.status, errorText);
-
         removeLoading();
-        appendAssistantMessage(
-          "Ahora mismo no he podido procesar tu consulta. Escríbemela de nuevo en una frase y te respondo sin arrastrar contexto anterior."
-        );
+        appendAssistantMessage(getSmartFallbackMessage());
         return;
       }
 
@@ -694,14 +550,14 @@
           ? data.state.lastAssistantSummary
           : conversationState.lastSummary || "";
 
-      let showProductCard = false;
-
       const responseProducts =
         Array.isArray(data.products) && data.products.length
           ? data.products
           : data.product
             ? [data.product]
             : [];
+
+      let showProductCard = false;
 
       if (responseProducts.length) {
         const firstProduct = responseProducts[0];
@@ -712,9 +568,7 @@
           !previousCoffee ||
           previousCoffee !== newCoffee;
 
-        if (newCoffee) {
-          conversationState.lastCoffee = newCoffee;
-        }
+        if (newCoffee) conversationState.lastCoffee = newCoffee;
       } else if (data.state?.activeCoffee) {
         conversationState.lastCoffee = data.state.activeCoffee;
       }
@@ -735,23 +589,20 @@
         });
       }
 
-      const forcedShowProductCard = responseProducts.length > 0;
-
       appendAssistantMessage(
         data.reply || "No he podido responder.",
-        responseProducts.length > 1
-          ? responseProducts
-          : responseProducts[0] || null,
+        responseProducts.length > 1 ? responseProducts : responseProducts[0] || null,
         showProductCard
       );
-
     } catch (error) {
       console.error("BARISTA sendMessage ERROR", error);
       removeLoading();
-      appendAssistantMessage(
-        "Ahora mismo no he podido procesar tu consulta. Escríbemela de nuevo en una frase y te respondo sin arrastrar contexto anterior."
-      );
+      appendAssistantMessage(getSmartFallbackMessage());
     }
+  }
+
+  function getSmartFallbackMessage() {
+    return "Ahora mismo no he podido procesar tu consulta. Escríbemela de nuevo en una frase y te respondo sin arrastrar contexto anterior.";
   }
 
   async function init() {
@@ -761,7 +612,7 @@
 
     try {
       await ensureSession();
-    } catch { }
+    } catch {}
   }
 
   if (document.readyState === "loading") {
@@ -774,24 +625,24 @@
 (function () {
   try {
     const params = new URLSearchParams(window.location.search);
-    const highlight = params.get('highlight');
+    const highlight = params.get("highlight");
 
     if (!highlight) return;
 
     setTimeout(() => {
       const el = document.querySelector(`[data-product-handle="${highlight}"]`);
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.style.outline = '2px solid #c9a96e';
-        el.style.outlineOffset = '4px';
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.style.outline = "2px solid #c9a96e";
+        el.style.outlineOffset = "4px";
       }
     }, 900);
-  } catch (e) { }
+  } catch {}
 })();
 
 window.arteBaristaNavigate = function (handle) {
   try {
-    const isCollection = window.location.pathname.includes('/collections');
+    const isCollection = window.location.pathname.includes("/collections");
 
     if (!isCollection) {
       window.location.href = `/collections/all?highlight=${handle}`;
@@ -800,13 +651,13 @@ window.arteBaristaNavigate = function (handle) {
 
     const el = document.querySelector(`[data-product-handle="${handle}"]`);
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
     } else {
       window.location.href = `/products/${handle}`;
     }
 
     return false;
-  } catch (e) {
+  } catch {
     window.location.href = `/products/${handle}`;
     return false;
   }
@@ -818,12 +669,11 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
 
     if (button) {
       button.disabled = true;
-      button.classList.remove('is-added', 'is-error');
-      button.classList.add('is-loading');
+      button.classList.remove("is-added", "is-error");
+      button.classList.add("is-loading");
     }
 
-    const productUrl = `/products/${handle}.js`;
-    const productRes = await fetch(productUrl);
+    const productRes = await fetch(`/products/${handle}.js`);
 
     if (!productRes.ok) {
       window.location.href = `/products/${handle}`;
@@ -838,11 +688,11 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
       return false;
     }
 
-    const addRes = await fetch('/cart/add.js', {
-      method: 'POST',
+    const addRes = await fetch("/cart/add.js", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
+        "Content-Type": "application/json",
+        Accept: "application/json",
       },
       body: JSON.stringify({
         id: firstAvailableVariant.id,
@@ -856,48 +706,43 @@ window.arteBaristaAddToCart = async function (handle, trigger) {
     }
 
     if (button) {
-      button.classList.remove('is-loading');
-      button.classList.add('is-added');
+      button.classList.remove("is-loading");
+      button.classList.add("is-added");
       button.disabled = false;
 
-      const feedback = button.closest('.arte-card')?.querySelector('.arte-card-feedback');
+      const feedback = button.closest(".arte-card")?.querySelector(".arte-card-feedback");
       if (feedback) {
-        feedback.textContent = 'Añadido al carrito';
-        feedback.classList.add('is-visible');
+        feedback.textContent = "Añadido al carrito";
+        feedback.classList.add("is-visible");
       }
 
       setTimeout(() => {
-        button.classList.remove('is-added');
-        const feedbackLater = button.closest('.arte-card')?.querySelector('.arte-card-feedback');
-        if (feedbackLater) {
-          feedbackLater.classList.remove('is-visible');
-        }
+        button.classList.remove("is-added");
+        const feedbackLater = button.closest(".arte-card")?.querySelector(".arte-card-feedback");
+        if (feedbackLater) feedbackLater.classList.remove("is-visible");
       }, 1800);
     }
 
     return false;
-  } catch (e) {
+  } catch {
     if (trigger) {
-      trigger.classList.remove('is-loading');
-      trigger.classList.add('is-error');
+      trigger.classList.remove("is-loading");
+      trigger.classList.add("is-error");
       trigger.disabled = false;
 
-      const feedback = trigger.closest('.arte-card')?.querySelector('.arte-card-feedback');
+      const feedback = trigger.closest(".arte-card")?.querySelector(".arte-card-feedback");
       if (feedback) {
-        feedback.textContent = 'No se pudo añadir';
-        feedback.classList.add('is-visible');
+        feedback.textContent = "No se pudo añadir";
+        feedback.classList.add("is-visible");
       }
 
       setTimeout(() => {
-        trigger.classList.remove('is-error');
-        const feedbackLater = trigger.closest('.arte-card')?.querySelector('.arte-card-feedback');
-        if (feedbackLater) {
-          feedbackLater.classList.remove('is-visible');
-        }
+        trigger.classList.remove("is-error");
+        const feedbackLater = trigger.closest(".arte-card")?.querySelector(".arte-card-feedback");
+        if (feedbackLater) feedbackLater.classList.remove("is-visible");
       }, 1800);
     }
 
     return false;
   }
-  
 };
