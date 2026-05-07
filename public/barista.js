@@ -48,7 +48,7 @@
   function saveSessionCache(value) {
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify(value));
-    } catch {}
+    } catch { }
   }
 
   function loadSessionCache() {
@@ -147,12 +147,32 @@
     autoResizeTextarea();
   }
 
+  function setClubArteVisible(isVisible) {
+    const display = isVisible ? "" : "none";
+    const visibility = isVisible ? "" : "hidden";
+    const opacity = isVisible ? "" : "0";
+    const pointerEvents = isVisible ? "" : "none";
+
+    document
+      .querySelectorAll(
+        '.smile-launcher-frame-container, .launcher-button, .launcher-container, [aria-label="Open Smile.io Rewards Program"], iframe[src*="smile"], iframe[id*="smile"], iframe[class*="smile"]'
+      )
+      .forEach((el) => {
+        el.style.setProperty("display", display, "important");
+        el.style.setProperty("visibility", visibility, "important");
+        el.style.setProperty("opacity", opacity, "important");
+        el.style.setProperty("pointer-events", pointerEvents, "important");
+      });
+  }
+
   async function openPanel() {
     const panel = document.getElementById("arte-barista-panel");
     panel.style.display = "flex";
     panel.style.zIndex = "2147483647";
 
     document.body.classList.add("barista-open");
+
+    setClubArteVisible(false);
 
     clearVisibleChat();
     appendLoading("Recuperando conversación...");
@@ -172,6 +192,7 @@
     panel.style.display = "none";
 
     document.body.classList.remove("barista-open");
+    setClubArteVisible(true);
 
     clearVisibleChat();
   }
@@ -184,8 +205,8 @@
   function renderWelcomeView(currentSession) {
     const lastConversation =
       currentSession &&
-      currentSession.lastConversation &&
-      Array.isArray(currentSession.lastConversation.messages)
+        currentSession.lastConversation &&
+        Array.isArray(currentSession.lastConversation.messages)
         ? currentSession.lastConversation
         : null;
 
@@ -233,7 +254,7 @@
           appendUserMessage("Continuar conversación");
           await sendMessage(
             lastConversation?.lastUserMessage ||
-              "Quiero continuar con la conversación anterior"
+            "Quiero continuar con la conversación anterior"
           );
         } else {
           conversationState.lastSummary = "";
@@ -370,17 +391,16 @@
           <div class="arte-card-kicker">${escapeHtml(getContextualCardLabel(product))}</div>
           <div class="arte-card-title">${safeName}</div>
 
-          ${
-            safePrice || safeFormat || safeComposition
-              ? `
+          ${safePrice || safeFormat || safeComposition
+        ? `
             <div class="arte-card-commerce">
               ${safeFormat ? `<div class="arte-card-format">${safeFormat}</div>` : ""}
               ${safePrice ? `<div class="arte-card-price">${safePrice}</div>` : ""}
               ${safeComposition ? `<div class="arte-card-composition">${safeComposition}</div>` : ""}
             </div>
           `
-              : ""
-          }
+        : ""
+      }
 
           <div class="arte-card-chips">${buildProductChips(product)}</div>
         </div>
@@ -427,7 +447,7 @@
               },
             }),
           });
-        } catch {}
+        } catch { }
       });
     });
 
@@ -531,7 +551,7 @@
         let errorText = "";
         try {
           errorText = await res.text();
-        } catch {}
+        } catch { }
 
         console.error("BARISTA /chat HTTP ERROR", res.status, errorText);
         removeLoading();
@@ -612,7 +632,7 @@
 
     try {
       await ensureSession();
-    } catch {}
+    } catch { }
   }
 
   if (document.readyState === "loading") {
@@ -637,7 +657,7 @@
         el.style.outlineOffset = "4px";
       }
     }, 900);
-  } catch {}
+  } catch { }
 })();
 
 window.arteBaristaNavigate = function (handle) {
