@@ -583,6 +583,11 @@
 
       let showProductCard = false;
 
+      const assistantIsAskingQuestion =
+        String(data.reply || "").includes("¿") ||
+        String(data.reply || "").toLowerCase().includes("necesito un dato") ||
+        String(data.reply || "").toLowerCase().includes("para afinar");
+
       if (responseProducts.length) {
         const firstProduct = responseProducts[0];
         const newCoffee = firstProduct?.name || "";
