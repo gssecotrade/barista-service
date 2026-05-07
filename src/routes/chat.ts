@@ -319,7 +319,6 @@ export async function chatRoutes(app: FastifyInstance) {
         forcedCommercialReply ||
         forcedPriceReply ||
         forcedEconomicsReply ||
-        forcedStructuredAnswer ||
         engineResult?.reply ||
         rawBaristaReply;
 
