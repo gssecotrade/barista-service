@@ -280,10 +280,27 @@ export async function chatRoutes(app: FastifyInstance) {
         hasPricingContext: !!pricingContext,
       });
 
+      const previousUserGoal =
+        typeof mergedInputState.lastUserGoal === "string"
+          ? mergedInputState.lastUserGoal
+          : "";
+
+      const isMethodAnswer =
+        ["espresso", "filtro", "italiana", "automatica", "automática"].includes(
+          message.trim().toLowerCase()
+        );
+
+      const commercialQuantitySource =
+        isMonthlyQuantityIntent(message)
+          ? message
+          : isMethodAnswer && isMonthlyQuantityIntent(previousUserGoal)
+            ? previousUserGoal
+            : message;
+
       const forcedCommercialReply =
         engineResult?.type === "professional_volume"
           ? null
-          : buildCommercialQuantityReply(message);
+          : buildCommercialQuantityReply(commercialQuantitySource);
 
       const forcedPriceResult = await buildProductPriceReply(message);
       const forcedPriceReply = forcedPriceResult?.reply ?? null;
