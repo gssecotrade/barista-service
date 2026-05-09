@@ -455,13 +455,6 @@ export async function chatRoutes(app: FastifyInstance) {
         })
       );
 
-      const shouldSuppressProducts =
-        hasPendingQuestion ||
-        !!commerceDecision.pendingQuestion ||
-        finalBaristaReply.includes("¿") ||
-        finalBaristaReply.toLowerCase().includes("necesito un dato") ||
-        finalBaristaReply.toLowerCase().includes("para afinar");
-
       const finalProductsWithCommerce = shouldSuppressProducts
         ? []
         : resolvedProductsWithCommerce;
