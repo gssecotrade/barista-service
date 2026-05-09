@@ -740,3 +740,150 @@
   line-height: 1.35;
   opacity: 0.78;
 }
+
+/* =========================================================
+   PRODUCT CARD — PREMIUM RECOMMENDATION
+   ========================================================= */
+
+.arte-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.arte-card.arte-card--sales {
+  background: #fffaf2;
+  border: 1px solid rgba(45, 28, 18, 0.12);
+  border-radius: 22px;
+  box-shadow: 0 18px 42px rgba(45, 28, 18, 0.12);
+  overflow: hidden;
+}
+
+.arte-card-minimal {
+  padding: 18px 18px 16px;
+}
+
+.arte-card-kicker {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a98455;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.arte-card-title {
+  font-size: 20px;
+  line-height: 1.08;
+  font-weight: 800;
+  color: #23170f;
+  margin-bottom: 14px;
+  max-width: 92%;
+}
+
+.arte-card-commerce {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(45, 28, 18, 0.08);
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.arte-card-format {
+  font-size: 13px;
+  color: #6d5a4c;
+  margin-bottom: 4px;
+}
+
+.arte-card-price {
+  font-size: 22px;
+  font-weight: 800;
+  color: #2b1a10;
+  margin-bottom: 4px;
+}
+
+.arte-card-composition {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #6d5a4c;
+}
+
+.arte-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.arte-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(169, 132, 85, 0.35);
+  background: #fffdf8;
+  color: #5a4637;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.arte-card-actions--sales {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.arte-card-buy-button {
+  appearance: none;
+  border: 0;
+  background: #22150d;
+  color: #fff;
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(34, 21, 13, 0.18);
+}
+
+.arte-card-actions--sales a {
+  color: #22150d;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(34, 21, 13, 0.35);
+}
+
+.arte-card-feedback {
+  width: 100%;
+  font-size: 12px;
+  color: #5a4637;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.arte-card-feedback.is-visible {
+  opacity: 1;
+}
+
+@media (max-width: 749px) {
+  .arte-card-title {
+    font-size: 19px;
+  }
+
+  .arte-card-price {
+    font-size: 21px;
+  }
+
+  .arte-card-buy-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .arte-card-actions--sales a {
+    margin: 0 auto;
+  }
+}
