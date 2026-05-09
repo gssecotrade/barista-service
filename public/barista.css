@@ -314,7 +314,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 14px;
-  padding: 16px 16px 14px;
+  padding: 14px 14px 12px;
 }
 
 .arte-card-minimal-main {
@@ -332,7 +332,7 @@
 }
 
 .arte-card-title {
-  font-size: 19px;
+  font-size: 16px;
   line-height: 1.15;
   font-weight: 700;
   color: #1f1812;
@@ -731,7 +731,7 @@
 }
 
 .arte-card-price {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   margin-bottom: 4px;
 }
@@ -824,8 +824,8 @@
   background: #fffdf8;
   color: #5a4637;
   border-radius: 999px;
-  padding: 5px 10px;
-  font-size: 11px;
+  padding: 4px 9px;
+  font-size: 10px;
   line-height: 1;
   font-weight: 600;
 }
@@ -914,7 +914,7 @@
 
 .arte-card-minimal {
   display: block;
-  padding: 20px 18px 18px;
+  padding: 14px 14px 12px;
 }
 
 .arte-card-kicker {
@@ -934,8 +934,8 @@
 }
 
 .arte-card-title {
-  font-size: 21px;
-  line-height: 1.12;
+  font-size: 17px;
+  line-height: 1.15;
   font-weight: 850;
   color: #1f140d;
   margin: 0 0 14px;
@@ -993,8 +993,8 @@
   background: rgba(255,255,255,0.72);
   color: #5f4937;
   border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 11px;
+  padding: 4px 9px;
+  font-size: 10px;
   line-height: 1;
   font-weight: 700;
 }
@@ -1012,8 +1012,8 @@
   border-radius: 999px;
   background: linear-gradient(135deg, #21150d 0%, #0d1016 100%);
   color: #fff;
-  padding: 13px 18px;
-  font-size: 14px;
+  padding: 10px 14px;
+  font-size: 13px;
   line-height: 1;
   font-weight: 800;
   cursor: pointer;
@@ -1058,7 +1058,7 @@
   }
 
   .arte-card-title {
-    font-size: 20px;
+    font-size: 17px;
   }
 
   .arte-card-commerce {
@@ -1068,6 +1068,6 @@
   .arte-card-price {
     grid-column: 1;
     grid-row: auto;
-    font-size: 21px;
+    font-size: 18px;
   }
 }
