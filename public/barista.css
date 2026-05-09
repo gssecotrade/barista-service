@@ -589,6 +589,7 @@
 
 .arte-card-add-icon svg {
   display: block;
+}
 
 .arte-card-add-icon:hover {
   background: #0d1016;
@@ -885,5 +886,188 @@
 
   .arte-card-actions--sales a {
     margin: 0 auto;
+  }
+}
+
+/* =========================================================
+   ARTE BARISTA — PRODUCT CARD FINAL PREMIUM OVERRIDE
+   ========================================================= */
+
+.arte-card-list {
+  width: 100%;
+  max-width: 340px;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.arte-card.arte-card--sales {
+  width: 100%;
+  background:
+    linear-gradient(180deg, #fffaf2 0%, #f8efe2 100%);
+  border: 1px solid rgba(166, 128, 79, 0.28);
+  border-radius: 24px;
+  box-shadow:
+    0 18px 42px rgba(34, 21, 13, 0.14),
+    inset 0 1px 0 rgba(255,255,255,0.85);
+  overflow: hidden;
+}
+
+.arte-card-minimal {
+  display: block;
+  padding: 20px 18px 18px;
+}
+
+.arte-card-kicker {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(169, 132, 85, 0.12);
+  color: #8b693e;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.arte-card-title {
+  font-size: 21px;
+  line-height: 1.12;
+  font-weight: 850;
+  color: #1f140d;
+  margin: 0 0 14px;
+  max-width: 100%;
+}
+
+.arte-card-commerce {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(166, 128, 79, 0.18);
+  border-radius: 18px;
+  padding: 13px 14px;
+  margin: 0 0 14px;
+}
+
+.arte-card-format {
+  grid-column: 1;
+  font-size: 13px;
+  color: #6a5542;
+  font-weight: 650;
+  margin: 0;
+}
+
+.arte-card-price {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 850;
+  color: #20140c;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.arte-card-composition {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #6a5542;
+  margin-top: 4px;
+}
+
+.arte-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0 0 16px;
+}
+
+.arte-chip {
+  border: 1px solid rgba(166, 128, 79, 0.28);
+  background: rgba(255,255,255,0.72);
+  color: #5f4937;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.arte-card-actions--sales {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 9px;
+  margin-top: 4px;
+}
+
+.arte-card-buy-button {
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #21150d 0%, #0d1016 100%);
+  color: #fff;
+  padding: 13px 18px;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 12px 26px rgba(34, 21, 13, 0.22);
+}
+
+.arte-card-buy-button:hover {
+  transform: translateY(-1px);
+}
+
+.arte-card-actions--sales a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  border: 1px solid rgba(34, 21, 13, 0.16);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.82);
+  color: #21150d;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.arte-card-feedback {
+  text-align: center;
+  font-size: 12px;
+  color: #6a5542;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.arte-card-feedback.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 640px) {
+  .arte-card-list {
+    max-width: 100%;
+  }
+
+  .arte-card-title {
+    font-size: 20px;
+  }
+
+  .arte-card-commerce {
+    grid-template-columns: 1fr;
+  }
+
+  .arte-card-price {
+    grid-column: 1;
+    grid-row: auto;
+    font-size: 21px;
   }
 }

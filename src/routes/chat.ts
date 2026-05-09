@@ -455,9 +455,14 @@ export async function chatRoutes(app: FastifyInstance) {
         })
       );
 
-      const finalProductsWithCommerce = shouldSuppressProducts
-        ? []
-        : resolvedProductsWithCommerce;
+      const finalProductsWithCommerce =
+        hasPendingQuestion ||
+          shouldSuppressProducts ||
+          finalBaristaReply.includes("¿cómo preparas") ||
+          finalBaristaReply.includes("necesito un dato") ||
+          finalBaristaReply.includes("para afinar")
+          ? []
+          : resolvedProductsWithCommerce;
 
       const nextState = mergeBaristaState(mergedInputState, {
         activeCoffee: inferredCoffee,
@@ -673,21 +678,45 @@ function inferTopicFromText(value: string): BaristaTopic | null {
 
 function inferDrinkTypeFromText(
   value: string
-): "coffee" | "cocktail" | "mocktail" | null {
+): "espresso" | "filter" | "moka" | "french_press" | "coffee" | "cocktail" | "mocktail" | null {
   const normalized = value.toLowerCase();
 
   if (normalized.includes("sin alcohol") || normalized.includes("mocktail")) {
     return "mocktail";
   }
 
-  if (normalized.includes("cóctel") || normalized.includes("cocktail")) {
+  if (normalized.includes("cóctel") || normalized.includes("coctel") || normalized.includes("cocktail")) {
     return "cocktail";
   }
 
+  if (normalized.includes("espresso")) {
+    return "espresso";
+  }
+
   if (
-    normalized.includes("espresso") ||
+    normalized.includes("filtro") ||
     normalized.includes("v60") ||
-    normalized.includes("chemex") ||
+    normalized.includes("chemex")
+  ) {
+    return "filter";
+  }
+
+  if (
+    normalized.includes("italiana") ||
+    normalized.includes("moka")
+  ) {
+    return "moka";
+  }
+
+  if (
+    normalized.includes("prensa francesa") ||
+    normalized.includes("prensa") ||
+    normalized.includes("french press")
+  ) {
+    return "french_press";
+  }
+
+  if (
     normalized.includes("cafetera") ||
     normalized.includes("café") ||
     normalized.includes("cafe")
@@ -983,22 +1012,31 @@ function buildCommercialQuantityReply(message: string): string | null {
       return [
         "Para ese consumo, la opción más práctica es resolver el mes con un formato estable.",
         "",
-        "Te recomiendo el Pack Daily Coffee - Consumo diario - 1 kg.",
+        "Te recomiendo el Pack Daily Coffee – Consumo diario – 1 kg.",
         "",
         "Es una compra sencilla, con continuidad y pensada para consumo diario.",
       ].join("\n");
     }
 
+    if (normalized.includes("espresso")) {
+      return [
+        "Para ese consumo, 1 kg puede quedarse corto. Lo razonable es planificar entre 1,5 kg y 2 kg al mes.",
+        "",
+        "Te recomiendo esta combinación:",
+        "",
+        "- 1 kg de Catuai como café diario.",
+        "- 500 g de Pacamara para los espressos de tarde o momentos con más carácter.",
+        "",
+        "Si quieres resolverlo con un producto ya preparado, el Pack Coffee Lover es la opción más cercana. Si buscas ajustar mejor cantidad, conviene añadir Catuai adicional.",
+      ].join("\n");
+    }
+
     return [
-      "Para tu consumo mensual, la compra más lógica es un pack completo, no productos sueltos.",
+      "Para ese consumo, 1 kg puede quedarse corto.",
       "",
-      wantsSpecialMoment
-        ? "Te recomiendo el Pack Coffee Lover - Selección especial - 1 kg."
-        : "Te recomiendo el Pack Daily Coffee - Consumo diario - 1 kg.",
+      "Antes de cerrar la combinación exacta necesito un dato clave:",
       "",
-      wantsSpecialMoment
-        ? "Te permite usar Catuai como café diario y reservar Pacamara para los momentos con más carácter: tarde, sobremesa o fin de semana."
-        : "Es la opción más eficiente para cubrir el mes con continuidad, equilibrio y una compra sencilla.",
+      "¿Cómo preparas normalmente el café: espresso, filtro, italiana / moka o prensa francesa?",
     ].join("\n");
   }
 
