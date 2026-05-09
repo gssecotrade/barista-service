@@ -373,6 +373,14 @@ export async function chatRoutes(app: FastifyInstance) {
         finalBaristaReply.includes("necesito un dato") ||
         finalBaristaReply.includes("para afinar");
 
+      const shouldSuppressProducts =
+        hasPendingQuestion ||
+        !!commerceDecision.pendingQuestion ||
+        finalBaristaReply.includes("¿") ||
+        finalBaristaReply.includes("¿cómo preparas") ||
+        finalBaristaReply.includes("necesito un dato") ||
+        finalBaristaReply.includes("para afinar");
+
       const shouldShowProduct =
         !hasPendingQuestion &&
         shouldReturnProduct({
