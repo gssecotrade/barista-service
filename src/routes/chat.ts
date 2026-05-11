@@ -931,49 +931,114 @@ function resolvePackFromReply(message: string, reply: string): ProductPayload | 
   return null;
 }
 
-function buildCommercialQuantityReply(
-  estimatedMonthlyCups: number,
-  inferredCoffee: string | null,
-  inferredDrinkType: string | null
-): string {
+function buildCommercialQuantityReply(message: string): string | null {
+  if (!isMonthlyQuantityIntent(message)) return null;
 
-  const isPremiumCoffee =
-    inferredCoffee?.includes("pacamara") ||
-    inferredCoffee?.includes("geisha");
+  const normalized = message.toLowerCase();
 
-  if (estimatedMonthlyCups >= 250) {
+  const weekdayDaily =
+    extractWeekdayDailyCoffeeCount(normalized) ??
+    extractDailyCoffeeCount(normalized) ??
+    3;
+
+  const weekendDaily =
+    extractWeekendDailyCoffeeCount(normalized) ??
+    weekdayDaily;
+
+  const estimatedMonthlyCups = weekdayDaily * 20 + weekendDaily * 8;
+
+  const method =
+    normalized.includes("filtro") ? "filtro" :
+    normalized.includes("moka") || normalized.includes("italiana") ? "italiana/moka" :
+    normalized.includes("prensa francesa") || normalized.includes("french press") ? "prensa francesa" :
+    "espresso";
+
+  const gramsPerCup =
+    method === "espresso" ? 9 :
+    method === "italiana/moka" ? 12 :
+    method === "filtro" ? 15 :
+    16;
+
+  const estimatedMonthlyKg = (estimatedMonthlyCups * gramsPerCup) / 1000;
+  const recommendedKg = Math.ceil(estimatedMonthlyKg * 2) / 2;
+
+  const wantsSingleCoffee =
+    normalized.includes("una sola referencia") ||
+    normalized.includes("un solo café") ||
+    normalized.includes("un solo cafe") ||
+    normalized.includes("solo un café") ||
+    normalized.includes("solo un cafe");
+
+  const wantsSpecialMoment =
+    normalized.includes("fin de semana") ||
+    normalized.includes("fines de semana") ||
+    normalized.includes("especial") ||
+    normalized.includes("media mañana") ||
+    normalized.includes("media manana") ||
+    normalized.includes("sobremesa") ||
+    normalized.includes("tarde") ||
+    normalized.includes("por la tarde");
+
+  const kgText = recommendedKg % 1 === 0 ? `${recommendedKg} kg` : `${recommendedKg.toFixed(1).replace(".", ",")} kg`;
+
+  if (recommendedKg <= 0.5) {
     return [
-      `Para un consumo de ${estimatedMonthlyCups} cafés mensuales, lo más recomendable es separar café diario y café de momentos especiales.`,
+      `Para tu consumo estimado, necesitas aproximadamente ${kgText} al mes.`,
       "",
-      "→ Café diario:",
-      "Catuai 1 kg",
+      "Te recomiendo Catuai en formato 500 g.",
       "",
-      isPremiumCoffee
-        ? "→ Café especial complementario: Pacamara 250 g"
-        : "→ Complemento opcional: Pacamara 250 g",
-      "",
-      "Así mantienes equilibrio entre calidad, frescura y coste mensual."
+      "Es la opción más equilibrada para consumo frecuente sin sobrecomprar.",
     ].join("\n");
   }
 
-  if (estimatedMonthlyCups >= 120) {
+  if (recommendedKg <= 1) {
     return [
-      `Para ese volumen de consumo, una bolsa de 1 kg de Catuai sería la opción más equilibrada para uso diario.`,
+      `Para tu consumo estimado, necesitas aproximadamente ${kgText} al mes.`,
       "",
-      isPremiumCoffee
-        ? "Además, puedes añadir Pacamara 250 g para momentos más especiales o preparaciones más pausadas."
-        : "Pacamara puede funcionar muy bien como complemento para fines de semana o sobremesa.",
+      wantsSpecialMoment && !wantsSingleCoffee
+        ? "Te recomiendo el Pack Coffee Lover - Selección especial - 1 kg."
+        : "Te recomiendo el Pack Daily Coffee - Consumo diario - 1 kg.",
       "",
-      "Es una combinación muy lógica para mantener variedad sin disparar el consumo."
+      wantsSpecialMoment && !wantsSingleCoffee
+        ? "Es una buena opción si quieres combinar Catuai como café diario y Pacamara para momentos con más carácter."
+        : "Es la opción más práctica para cubrir el mes con una sola compra estable.",
+    ].join("\n");
+  }
+
+  if (recommendedKg <= 1.5) {
+    return [
+      `Para tu consumo estimado, 1 kg puede quedarse justo. Lo razonable es planificar unos ${kgText} al mes.`,
+      "",
+      wantsSingleCoffee
+        ? "Te recomiendo 1 unidad del Pack Daily Coffee - Consumo diario - 1 kg y añadir 1 bolsa de 500 g de Catuai."
+        : "Te recomiendo 1 unidad del Pack Coffee Lover - Selección especial - 1 kg y añadir 1 bolsa de 500 g de Catuai.",
+      "",
+      "Así cubres mejor el mes y evitas quedarte corto a mitad de camino.",
+    ].join("\n");
+  }
+
+  if (recommendedKg <= 2) {
+    return [
+      `Para tu consumo estimado, necesitas aproximadamente ${kgText} al mes.`,
+      "",
+      wantsSingleCoffee
+        ? "Te recomiendo 2 unidades del Pack Daily Coffee - Consumo diario - 1 kg."
+        : "Te recomiendo 2 unidades del Pack Coffee Lover - Selección especial - 1 kg.",
+      "",
+      wantsSingleCoffee
+        ? "Es la opción más sencilla si quieres mantener una sola referencia durante todo el mes."
+        : "Es la opción más lógica si quieres combinar café diario con momentos de mayor carácter.",
     ].join("\n");
   }
 
   return [
-    "Para ese consumo mensual, una bolsa de 500 g debería cubrir tus necesidades con margen.",
+    `Para tu consumo estimado, necesitas aproximadamente ${kgText} al mes.`,
     "",
-    isPremiumCoffee
-      ? "Si buscas una experiencia más expresiva y compleja, Pacamara puede encajar muy bien."
-      : "Catuai es la opción más equilibrada para consumo frecuente.",
+    wantsSingleCoffee
+      ? `Te recomiendo planificar ${Math.ceil(recommendedKg)} kg mensuales con Pack Daily Coffee - Consumo diario - 1 kg.`
+      : `Te recomiendo planificar ${Math.ceil(recommendedKg)} kg mensuales combinando Pack Coffee Lover - Selección especial - 1 kg con Catuai adicional.`,
+    "",
+    "Para ese volumen, la clave es resolverlo como compra mensual estable, no como reposición improvisada.",
   ].join("\n");
 }
 

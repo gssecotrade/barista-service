@@ -34,7 +34,7 @@ function detectMethod(text: string): string | null {
   if (includesAny(text, ["espresso", "expreso"])) return "espresso";
   if (includesAny(text, ["filtro", "v60", "chemex"])) return "filtro";
   if (includesAny(text, ["italiana", "moka"])) return "italiana";
-  if (includesAny(text, ["automática", "automatica", "superautomática", "superautomatica"])) return "automática";
+  if (includesAny(text, ["prensa francesa", "french press"])) return "prensa francesa";
   return null;
 }
 
