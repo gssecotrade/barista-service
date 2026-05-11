@@ -416,13 +416,21 @@ PROHIBIDO
     { role: "user", content: userMessage },
   ];
 
-  const completion = await client.chat.completions.create({
-    model: "gpt-4o",
-    messages,
-    temperature: 0.7,
-  });
+  let reply = "";
 
-  const reply = completion.choices[0].message.content || "";
+  try {
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages,
+      temperature: 0.7,
+    });
+
+    reply = completion.choices?.[0]?.message?.content || "";
+  } catch (error) {
+    console.error("BARISTA OPENAI ERROR:", error);
+    reply =
+      "Ya tengo el método de preparación. Para afinar bien la cantidad mensual, dime cuántos cafés tomas al día aproximadamente y si los tomas todos iguales o reservas alguno para momentos especiales.";
+  }
 
   return {
     reply,
