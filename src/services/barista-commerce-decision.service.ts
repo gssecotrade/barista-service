@@ -80,7 +80,7 @@ export function buildCommerceDecision(message: string): CommerceDecision {
         products: [],
         pendingQuestion: "method",
         reply:
-          "Perfecto. Para afinar bien la recomendación de compra mensual necesito un dato clave: ¿cómo preparas normalmente el café: espresso, filtro, italiana o automática?",
+          "Perfecto. Para afinar bien la recomendación de compra mensual necesito un dato clave: ¿cómo preparas normalmente el café: espresso, filtro, italiana/moka o prensa francesa?",
       };
     }
 

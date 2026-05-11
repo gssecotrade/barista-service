@@ -217,7 +217,7 @@
 
     const isWeakLastMessage =
       lastUserMessage.length < 18 ||
-      ["espresso", "filtro", "italiana", "automática", "automatica", "sí", "si", "no"].includes(lastUserMessage.toLowerCase());
+      ["espresso", "filtro", "italiana", "prensa francesa", "sí", "si", "no"].includes(lastUserMessage.toLowerCase());
 
     if (lastUserMessage && !isWeakLastMessage) {
       appendAssistantMessage(
