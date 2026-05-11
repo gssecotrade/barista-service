@@ -302,6 +302,15 @@ export async function chatRoutes(app: FastifyInstance) {
           ? null
           : buildCommercialQuantityReply(commercialQuantitySource);
 
+      const needsMoreCommercialContext =
+        forcedCommercialReply &&
+        (
+          forcedCommercialReply.includes("¿Cómo preparas") ||
+          forcedCommercialReply.includes("¿Cuántos cafés") ||
+          forcedCommercialReply.includes("necesito un dato") ||
+          forcedCommercialReply.includes("Para recomendarte bien")
+        );
+
       const forcedPriceResult = await buildProductPriceReply(message);
       const forcedPriceReply = forcedPriceResult?.reply ?? null;
 
@@ -371,7 +380,8 @@ export async function chatRoutes(app: FastifyInstance) {
         Boolean(commerceDecision.pendingQuestion) ||
         finalBaristaReply.includes("¿cómo preparas") ||
         finalBaristaReply.includes("necesito un dato") ||
-        finalBaristaReply.includes("para afinar");
+        finalBaristaReply.includes("Para recomendarte bien") ||
+        finalBaristaReply.includes("¿Cuántos cafés");
 
       const shouldSuppressProducts =
         hasPendingQuestion ||
@@ -382,7 +392,7 @@ export async function chatRoutes(app: FastifyInstance) {
         finalBaristaReply.includes("para afinar");
 
       const shouldShowProduct =
-        !hasPendingQuestion &&
+        !needsMoreCommercialContext &&
         shouldReturnProduct({
           message,
           reply: finalBaristaReply,
@@ -456,11 +466,7 @@ export async function chatRoutes(app: FastifyInstance) {
       );
 
       const finalProductsWithCommerce =
-        hasPendingQuestion ||
-          shouldSuppressProducts ||
-          finalBaristaReply.includes("¿cómo preparas") ||
-          finalBaristaReply.includes("necesito un dato") ||
-          finalBaristaReply.includes("para afinar")
+        hasPendingQuestion || shouldSuppressProducts
           ? []
           : resolvedProductsWithCommerce;
 
@@ -939,15 +945,43 @@ function buildCommercialQuantityReply(message: string): string | null {
   const weekdayDaily =
     extractWeekdayDailyCoffeeCount(normalized) ??
     extractDailyCoffeeCount(normalized) ??
-    3;
+    null;
 
   const weekendDaily =
     extractWeekendDailyCoffeeCount(normalized) ??
     weekdayDaily;
 
-  const estimatedMonthlyCups = weekdayDaily * 20 + weekendDaily * 8;
+  const hasDailyConsumption = typeof weekdayDaily === "number" && weekdayDaily > 0;
 
-  const gramsPerCup = 9;
+  const hasBrewMethod =
+    normalized.includes("espresso") ||
+    normalized.includes("filtro") ||
+    normalized.includes("italiana") ||
+    normalized.includes("moka") ||
+    normalized.includes("prensa francesa");
+
+  if (!hasDailyConsumption) {
+    return [
+      "Perfecto. Para recomendarte bien el café y la cantidad mensual necesito primero saber tu consumo aproximado.",
+      "",
+      "¿Cuántos cafés preparas al día y en qué momentos principales: mañana, tarde o fin de semana?",
+    ].join("\n");
+  }
+
+  if (!hasBrewMethod) {
+    return [
+      "Perfecto. Para afinar bien la recomendación de compra mensual necesito un dato clave:",
+      "",
+      "¿Cómo preparas normalmente el café: espresso, filtro, italiana/moka o prensa francesa?",
+    ].join("\n");
+  }
+
+  const estimatedMonthlyCups = weekdayDaily * 20 + (weekendDaily ?? weekdayDaily) * 8;
+
+  const gramsPerCup = normalized.includes("filtro") || normalized.includes("prensa francesa")
+    ? 12
+    : 9;
+
   const estimatedMonthlyKg = (estimatedMonthlyCups * gramsPerCup) / 1000;
   const recommendedKg = Math.max(0.5, Math.ceil(estimatedMonthlyKg * 2) / 2);
 
@@ -968,9 +1002,12 @@ function buildCommercialQuantityReply(message: string): string | null {
     normalized.includes("tarde") ||
     normalized.includes("por la tarde");
 
+  const kgText = estimatedMonthlyKg.toFixed(1).replace(".", ",");
+  const recommendedKgText = recommendedKg.toString().replace(".", ",");
+
   if (recommendedKg <= 0.5) {
     return [
-      `Para tu consumo estimado, necesitas aproximadamente ${estimatedMonthlyKg.toFixed(1).replace(".", ",")} kg al mes.`,
+      `Para tu consumo estimado, necesitas aproximadamente ${kgText} kg al mes.`,
       "",
       "Te recomiendo Catuai en formato 500 g.",
       "",
@@ -980,11 +1017,9 @@ function buildCommercialQuantityReply(message: string): string | null {
 
   if (recommendedKg <= 1) {
     return [
-      `Para tu consumo estimado, necesitas aproximadamente ${estimatedMonthlyKg.toFixed(1).replace(".", ",")} kg al mes.`,
+      `Para tu consumo estimado, necesitas aproximadamente ${kgText} kg al mes.`,
       "",
-      wantsSingleCoffee
-        ? "Te recomiendo resolverlo con 1 kg de Catuai."
-        : "Te recomiendo 1 kg de Catuai como café diario.",
+      "Te recomiendo 1 kg de Catuai como café diario.",
       "",
       "Es una compra sencilla, estable y adecuada para mantener continuidad durante el mes.",
     ].join("\n");
@@ -992,40 +1027,40 @@ function buildCommercialQuantityReply(message: string): string | null {
 
   if (recommendedKg <= 1.5) {
     return [
-      `Para tu consumo estimado, necesitas aproximadamente ${estimatedMonthlyKg.toFixed(1).replace(".", ",")} kg al mes.`,
+      `Para tu consumo estimado, necesitas aproximadamente ${kgText} kg al mes.`,
       "",
       wantsSingleCoffee
-        ? "Te recomiendo 1 kg de Catuai y añadir 1 bolsa de 500 g de Catuai."
-        : "Te recomiendo 1 unidad del Pack Daily Coffee - Consumo diario - 1 kg y añadir 1 bolsa de 500 g de Catuai.",
+        ? "Te recomiendo 1,5 kg de Catuai."
+        : "Te recomiendo 1 kg de Catuai y añadir 500 g adicionales para no quedarte corto.",
       "",
-      "Con esta combinación cubres mejor el mes sin quedarte corto a mitad de camino.",
+      "Con esta combinación cubres mejor el mes sin depender de reposiciones improvisadas.",
     ].join("\n");
   }
 
   if (recommendedKg <= 2) {
     return [
-      `Para tu consumo estimado, necesitas aproximadamente ${estimatedMonthlyKg.toFixed(1).replace(".", ",")} kg al mes.`,
+      `Para tu consumo estimado, necesitas aproximadamente ${kgText} kg al mes.`,
       "",
       wantsSingleCoffee
         ? "Te recomiendo 2 kg de Catuai."
         : wantsSpecialMoment
-          ? "Te recomiendo 2 unidades del Pack Coffee Lover - Selección especial - 1 kg."
-          : "Te recomiendo 2 unidades del Pack Daily Coffee - Consumo diario - 1 kg.",
+          ? "Te recomiendo 1 kg de Catuai como base diaria y 1 kg del Pack Coffee Lover - Selección especial para introducir variedad."
+          : "Te recomiendo 2 kg de Catuai como café diario.",
       "",
       wantsSpecialMoment && !wantsSingleCoffee
-        ? "Es la opción más lógica si quieres combinar Catuai como café diario y Pacamara para momentos con más carácter."
+        ? "Es la opción más lógica si quieres combinar regularidad diaria con momentos de más carácter."
         : "Es la forma más ordenada de resolver el mes con continuidad y sin compras improvisadas.",
     ].join("\n");
   }
 
   return [
-    `Para tu consumo estimado, necesitas aproximadamente ${estimatedMonthlyKg.toFixed(1).replace(".", ",")} kg al mes.`,
+    `Para tu consumo estimado, necesitas aproximadamente ${kgText} kg al mes.`,
     "",
     wantsSingleCoffee
-      ? `Te recomiendo planificar ${recommendedKg.toString().replace(".", ",")} kg mensuales de Catuai.`
+      ? `Te recomiendo planificar ${recommendedKgText} kg mensuales de Catuai.`
       : wantsSpecialMoment
-        ? `Te recomiendo planificar ${recommendedKg.toString().replace(".", ",")} kg mensuales combinando Pack Coffee Lover - Selección especial - 1 kg con Catuai adicional.`
-        : `Te recomiendo planificar ${recommendedKg.toString().replace(".", ",")} kg mensuales con Pack Daily Coffee - Consumo diario - 1 kg y Catuai adicional.`,
+        ? `Te recomiendo planificar ${recommendedKgText} kg mensuales combinando Catuai como base diaria y Pack Coffee Lover para momentos de mayor carácter.`
+        : `Te recomiendo planificar ${recommendedKgText} kg mensuales de Catuai como café principal.`,
     "",
     "Para ese volumen, la clave es resolverlo como compra mensual estable, no como reposición improvisada.",
   ].join("\n");
