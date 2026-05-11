@@ -9,7 +9,7 @@ type BusinessMode =
 
 export type BaristaDecisionIntent =
   | "professional_volume"
-    "professional_pricing_strategy"
+"professional_pricing_strategy"
   | "cup_economics"
   | "monthly_quantity"
   | "general";
@@ -63,21 +63,21 @@ export type ProfessionalMixResult = {
 
 export type DecisionEngineResult =
   | {
-      type: "professional_volume";
-      reply: string;
-      meta: ProfessionalVolumeResult;
-      mix: ProfessionalMixResult | null;
-    }
+    type: "professional_volume";
+    reply: string;
+    meta: ProfessionalVolumeResult;
+    mix: ProfessionalMixResult | null;
+  }
   | {
-      type: "professional_pricing_strategy";
-      reply: string;
-      meta: null;
-      mix: null;
-    }
+    type: "professional_pricing_strategy";
+    reply: string;
+    meta: null;
+    mix: null;
+  }
   | {
-      type: "monthly_quantity";
-      reply: string;
-    }
+    type: "monthly_quantity";
+    reply: string;
+  }
   | null;
 
 type ShopifyProductJson = {
@@ -512,8 +512,8 @@ export function buildProfessionalVolumeReply(
     result.days === 15
       ? "cada 15 días"
       : result.days === 7
-      ? "por semana"
-      : "al mes";
+        ? "por semana"
+        : "al mes";
 
   const lines: string[] = [
     `Necesitarías aproximadamente ${formatKg(result.totalKg)} de café ${periodLabel}.`,
@@ -767,10 +767,19 @@ function getBusinessModeLabel(mode: BusinessMode): string {
 export function buildCommercialQuantityReplyAdvanced(message: string): string | null {
   const normalized = normalize(message);
 
-  const weekdayDaily =
+  const detectedDaily =
     extractWeekdayDailyCoffeeCount(normalized) ??
-    extractDailyCoffeeCount(normalized) ??
-    3;
+    extractDailyCoffeeCount(normalized);
+
+  if (!detectedDaily) {
+    return [
+      "Para recomendarte bien el café y la cantidad mensual necesito primero saber tu consumo.",
+      "",
+      "¿Cuántos cafés tomas al día aproximadamente?",
+    ].join("\n");
+  }
+
+  const weekdayDaily = detectedDaily;
 
   const weekendDaily =
     extractWeekendDailyCoffeeCount(normalized) ?? weekdayDaily;
@@ -789,6 +798,21 @@ export function buildCommercialQuantityReplyAdvanced(message: string): string | 
     normalized.includes("fines de semana") ||
     hasAfterMealMoment ||
     hasMidMorningMoment;
+
+  const hasBrewingMethod =
+    normalized.includes("espresso") ||
+    normalized.includes("filtro") ||
+    normalized.includes("italiana") ||
+    normalized.includes("moka") ||
+    normalized.includes("prensa francesa");
+
+  if (!hasBrewingMethod) {
+    return [
+      "Perfecto. Para afinar bien la recomendación necesito entender cómo preparas normalmente el café.",
+      "",
+      "¿Usas espresso, filtro, italiana/moka o prensa francesa?",
+    ].join("\n");
+  }
 
   const estimatedMonthlyCups = weekdayDaily * 20 + weekendDaily * 8;
 

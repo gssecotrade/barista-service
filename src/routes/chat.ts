@@ -942,10 +942,19 @@ function buildCommercialQuantityReply(message: string): string | null {
 
   const normalized = message.toLowerCase();
 
-  const weekdayDaily =
+  const detectedDaily =
     extractWeekdayDailyCoffeeCount(normalized) ??
-    extractDailyCoffeeCount(normalized) ??
-    null;
+    extractDailyCoffeeCount(normalized);
+
+  if (!detectedDaily) {
+    return [
+      "Para recomendarte bien el café y la cantidad mensual necesito primero saber tu consumo.",
+      "",
+      "¿Cuántos cafés tomas al día aproximadamente?",
+    ].join("\n");
+  }
+
+  const weekdayDaily = detectedDaily;
 
   const weekendDaily =
     extractWeekendDailyCoffeeCount(normalized) ??
