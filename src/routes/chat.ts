@@ -167,8 +167,21 @@ export async function chatRoutes(app: FastifyInstance) {
         message.toLowerCase().includes("rotacion") ||
         message.toLowerCase().includes("horeca");
 
+      const previousUserGoal =
+        typeof mergedInputState.lastUserGoal === "string"
+          ? mergedInputState.lastUserGoal
+          : "";
+
+      const isMethodAnswer =
+        ["espresso", "filtro", "italiana", "italiana-moka", "moka", "prensa francesa"].includes(
+          message.trim().toLowerCase()
+        );
+
       const forceStructuredAnswer =
-        isPricingIntent || isMonthlyQuantityIntent(message) || commerceDecision.handled;
+        isPricingIntent ||
+        isMonthlyQuantityIntent(message) ||
+        (isMethodAnswer && isMonthlyQuantityIntent(previousUserGoal)) ||
+        commerceDecision.handled;
 
       const averageCupPrice = extractAverageCupPrice(message);
 
@@ -280,21 +293,11 @@ export async function chatRoutes(app: FastifyInstance) {
         hasPricingContext: !!pricingContext,
       });
 
-      const previousUserGoal =
-        typeof mergedInputState.lastUserGoal === "string"
-          ? mergedInputState.lastUserGoal
-          : "";
-
-      const isMethodAnswer =
-        ["espresso", "filtro", "italiana-moka", "prensa francesa"].includes(
-          message.trim().toLowerCase()
-        );
-
       const commercialQuantitySource =
         isMonthlyQuantityIntent(message)
           ? message
           : isMethodAnswer && isMonthlyQuantityIntent(previousUserGoal)
-            ? previousUserGoal
+            ? `${previousUserGoal}. Método de preparación: ${message}`
             : message;
 
       const forcedCommercialReply =
