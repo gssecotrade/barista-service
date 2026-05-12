@@ -461,7 +461,7 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const engineProduct =
         engineResult?.type === "professional_volume"
-          ? resolveProductFromProfessionalEngine(engineResult)
+          ? buildProfessionalSupplyProduct(engineResult)
           : null;
 
       const resolvedProducts =
@@ -1583,6 +1583,43 @@ function prettyCoffee(coffee: string): string {
   if (coffee === "geisha") return "Geisha";
   if (coffee === "pacamara") return "Pacamara";
   return coffee;
+}
+
+function buildProfessionalSupplyProduct(engineResult: any): ProductPayload | null {
+  if (engineResult?.type !== "professional_volume") return null;
+
+  const meta = engineResult.meta;
+  const mix = engineResult.mix;
+
+  if (!meta || typeof meta.totalKg !== "number") return null;
+
+  const monthlyKg = Math.ceil(meta.totalKg);
+  const fortnightKg = Math.ceil(monthlyKg / 2);
+
+  const mainLine = mix?.lines?.[0];
+  const coffeeName = mainLine?.name || "Catuai";
+  const handle = mainLine?.handle || "catuai";
+
+  const replyText = String(engineResult.reply || "").toLowerCase();
+
+  const isFortnightly =
+    meta.days === 15 ||
+    replyText.includes("quincenal") ||
+    replyText.includes("cada 15");
+
+  const supplyKg = isFortnightly ? fortnightKg : monthlyKg;
+  const periodLabel = isFortnightly ? "cada 15 días" : "al mes";
+
+  return {
+    handle,
+    name: `Suministro profesional ${coffeeName}`,
+    reason: `${supplyKg} kg ${periodLabel}. Plan recomendado para mantener continuidad, frescura y estabilidad operativa.`,
+    image: "",
+    url: mix?.cartUrl || `https://arte-coffee.com/products/${handle}`,
+    format: `${supplyKg} kg ${periodLabel}`,
+    composition: `${supplyKg} bolsas de 1 kg`,
+    price: "Suministro horeca",
+  };
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
