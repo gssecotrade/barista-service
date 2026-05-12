@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { trackEvent } from "../services/barista-analytics.service";
+import { trackEvent } from "../services/barista-analytics.service.js";
 
 export async function trackRoutes(app: FastifyInstance) {
   app.post("/track", async (request, reply) => {

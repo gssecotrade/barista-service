@@ -9,6 +9,15 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/services/memory.service.ts",
+    "src/services/profile.service.ts",
+    "src/services/recommendation.service.ts",
+    "src/services/user.service.ts"
+  ]
 }

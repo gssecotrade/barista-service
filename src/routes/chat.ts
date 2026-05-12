@@ -1,13 +1,13 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import { prisma } from "../db/prisma";
-import { generateBaristaResponse } from "../services/barista-brain.service";
+import { prisma } from "../db/prisma.js";
+import { generateBaristaResponse } from "../services/barista-brain.service.js";
 import {
   EMPTY_BARISTA_STATE,
   mergeBaristaState,
   normalizeBaristaState,
-} from "../services/barista-state.service";
+} from "../services/barista-state.service.js";
 import {
   buildCupEconomicsReply,
   buildProfessionalEconomicsReply,
@@ -16,9 +16,9 @@ import {
   extractAverageCupPrice,
   isCupEconomicsIntent,
   getShopifyProductCommerceInfo,
-} from "../services/barista-pricing.service";
-import { runBaristaDecisionEngine } from "../services/barista-decision-engine.service";
-import { buildCommerceDecision } from "../services/barista-commerce-decision.service";
+} from "../services/barista-pricing.service.js";
+import { runBaristaDecisionEngine } from "../services/barista-decision-engine.service.js";
+import { buildCommerceDecision } from "../services/barista-commerce-decision.service.js";
 
 function shouldMentionClubArte(userMessage: string): boolean {
   const msg = userMessage.toLowerCase();
@@ -457,8 +457,12 @@ export async function chatRoutes(app: FastifyInstance) {
                   })
                   : [];
 
+      const validResolvedProducts = resolvedProducts.filter(
+        (product): product is ProductPayload => product !== null
+      );
+
       const resolvedProductsWithCommerce = await Promise.all(
-        resolvedProducts.map(async (product) => {
+        validResolvedProducts.map(async (product) => {
           const commerceInfo = await getShopifyProductCommerceInfo(product.handle);
 
           return {
@@ -476,7 +480,7 @@ export async function chatRoutes(app: FastifyInstance) {
       const nextState = mergeBaristaState(mergedInputState, {
         activeCoffee: inferredCoffee,
         activeTopic: inferredTopic,
-        activeDrinkType: inferredDrinkType,
+        activeDrinkType: mapToStateDrinkType(inferredDrinkType),
         activeRecipe: inferredRecipe,
         pendingQuestion: commerceDecision.pendingQuestion ?? null,
         lastUserGoal: message,
@@ -1173,25 +1177,94 @@ function isNonCommercialQuantityReply({
 }
 
 function isMonthlyQuantityIntent(message: string): boolean {
-  const source = message.toLowerCase();
+  const source = normalizeIntentText(message);
+
+  const quantitySignals = [
+    "cantidad",
+    "cuanto",
+    "cuanta",
+    "cuantos",
+    "cuantas",
+    "kg",
+    "kilo",
+    "kilos",
+    "gramos",
+    "bolsa",
+    "bolsas",
+    "formato",
+    "formatos",
+    "comprar",
+    "compra",
+    "reponer",
+    "reposicion",
+    "necesito",
+    "recomienda",
+    "recomiendas",
+    "aconseja",
+    "aconsejame",
+  ];
+
+  const frequencySignals = [
+    "mes",
+    "mensual",
+    "mensualmente",
+    "semana",
+    "semanal",
+    "diario",
+    "diarios",
+    "dia",
+    "dias",
+    "consumo",
+    "consumimos",
+    "tomo",
+    "tomamos",
+    "preparo",
+    "preparamos",
+    "cafes al dia",
+    "cafes diarios",
+    "al mes",
+  ];
+
+  const coffeeSignals = [
+    "cafe",
+    "cafes",
+    "espresso",
+    "filtro",
+    "italiana",
+    "moka",
+    "prensa francesa",
+    "catuai",
+    "pacamara",
+    "geisha",
+  ];
+
+  const quantityScore = countIntentMatches(source, quantitySignals);
+  const frequencyScore = countIntentMatches(source, frequencySignals);
+  const coffeeScore = countIntentMatches(source, coffeeSignals);
+
+  const hasNumber = /\d+/.test(source);
 
   return (
-    source.includes("cuánto comprar") ||
-    source.includes("cuanto comprar") ||
-    source.includes("cantidad a comprar") ||
-    source.includes("qué cantidad comprar") ||
-    source.includes("que cantidad comprar") ||
-    source.includes("mensualmente") ||
-    source.includes("al mes") ||
-    source.includes("consumo mensual") ||
-    source.includes("consumo semanal") ||
-    source.includes("tomo") ||
-    source.includes("cafés al día") ||
-    source.includes("cafes al dia") ||
-    source.includes("rutina de consumo") ||
-    source.includes("qué me recomiendas comprar") ||
-    source.includes("que me recomiendas comprar")
+    (quantityScore >= 1 && frequencyScore >= 1) ||
+    (coffeeScore >= 1 && frequencyScore >= 1 && hasNumber) ||
+    (quantityScore >= 2 && coffeeScore >= 1)
   );
+}
+
+function normalizeIntentText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[¿?¡!.,;:()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function countIntentMatches(source: string, signals: string[]): number {
+  return signals.reduce((score, signal) => {
+    return source.includes(signal) ? score + 1 : score;
+  }, 0);
 }
 
 function extractTotalCoffeesFromText(message: string): number | null {
@@ -1390,7 +1463,15 @@ function buildAssistantSummary({
   coffee: CoffeeHandle | null;
   topic: BaristaTopic | null;
   recipe: string | null;
-  drinkType: "coffee" | "cocktail" | "mocktail" | null;
+  drinkType:
+  | "coffee"
+  | "cocktail"
+  | "mocktail"
+  | "filter"
+  | "espresso"
+  | "moka"
+  | "french_press"
+  | null;
   reply: string;
 }): string {
   if (recipe && coffee) {
@@ -1445,4 +1526,11 @@ function prettyCoffee(coffee: string): string {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function mapToStateDrinkType(
+  value: "coffee" | "cocktail" | "mocktail" | "filter" | "espresso" | "moka" | "french_press" | null
+): "coffee" | "cocktail" | "mocktail" | undefined {
+  if (value === "cocktail" || value === "mocktail") return value;
+  if (value) return "coffee";
+  return undefined;
 }

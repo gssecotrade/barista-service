@@ -115,8 +115,11 @@ export async function buildCupEconomicsReply(params: {
     text.includes("carta");
 
   const handles = extractCoffeeHandlesFromMessage(message);
-  const targetHandles =
-    handles.length > 0 ? handles : ["catuai", "pacamara", "geisha"];
+
+  const targetHandles: CoffeeHandle[] =
+    handles.length > 0
+      ? handles
+      : ["catuai", "pacamara", "geisha"];
 
   const products = await Promise.all(
     targetHandles.map((handle) => getProductPricing(handle))
@@ -321,7 +324,7 @@ async function getProductPricing(handle: CoffeeHandle): Promise<ProductPricingIn
 
   const data = (await response.json()) as ShopifyProductJson;
 
-  const variants = (data.variants || [])
+  const variants: ProductVariantInfo[] = (data.variants || [])
     .map((variant) => {
       const bagSizeGrams = parseBagSizeGrams(variant.title || "");
       if (!bagSizeGrams) return null;
@@ -335,10 +338,10 @@ async function getProductPricing(handle: CoffeeHandle): Promise<ProductPricingIn
         priceB2C,
         priceB2B,
         bagSizeGrams,
-      } satisfies ProductVariantInfo;
+      };
     })
-    .filter(Boolean)
-    .sort((a, b) => b.bagSizeGrams - a.bagSizeGrams) as ProductVariantInfo[];
+    .filter((v): v is ProductVariantInfo => v !== null)
+    .sort((a, b) => b.bagSizeGrams - a.bagSizeGrams);
 
   const uniqueVariantsMap = new Map<number, ProductVariantInfo>();
 
@@ -382,7 +385,10 @@ export async function buildProductPriceReply(message: string): Promise<{
   if (source.includes("pacamara")) handles.push("pacamara");
   if (source.includes("geisha")) handles.push("geisha");
 
-  const targetHandles = handles.length ? handles : ["catuai", "pacamara", "geisha"];
+  const targetHandles: CoffeeHandle[] =
+    handles.length > 0
+      ? handles
+      : ["catuai", "pacamara", "geisha"];
 
   const products = await Promise.all(
     targetHandles.map((handle) => getProductPricing(handle))

@@ -9,10 +9,12 @@ type BusinessMode =
 
 export type BaristaDecisionIntent =
   | "professional_volume"
-"professional_pricing_strategy"
+  | "professional_pricing_strategy"
   | "cup_economics"
   | "monthly_quantity"
   | "general";
+
+type BaristaEngineType = BaristaDecisionIntent;
 
 export type ProfessionalVolumeResult = {
   coffeesPerDay: number;

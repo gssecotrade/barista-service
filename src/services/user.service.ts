@@ -1,4 +1,4 @@
-import { prisma } from "../db/prisma";
+import { prisma } from "../db/prisma.js";
 
 export async function getOrCreateUser(externalUserId: string) {
   let user = await prisma.user.findUnique({

@@ -6,9 +6,9 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 
-import { sessionRoutes } from "./routes/session";
-import { chatRoutes } from "./routes/chat";
-import { trackRoutes } from "./routes/track";
+import { sessionRoutes } from "./routes/session.js";
+import { chatRoutes } from "./routes/chat.js";
+import { trackRoutes } from "./routes/track.js";
 
 const app = Fastify({
   logger: true,

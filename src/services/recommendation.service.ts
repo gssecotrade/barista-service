@@ -1,4 +1,4 @@
-import { prisma } from "../db/prisma";
+import { prisma } from "../db/prisma.js";
 
 async function recommendCoffeeForUser(userId: string) {
   const preferences = await prisma.preference.findMany({

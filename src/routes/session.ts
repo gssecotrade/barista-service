@@ -1,12 +1,12 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import { prisma } from "../db/prisma";
+import { prisma } from "../db/prisma.js";
 import {
   EMPTY_BARISTA_STATE,
   normalizeBaristaState,
   summarizeStateForWelcome,
-} from "../services/barista-state.service";
+} from "../services/barista-state.service.js";
 
 const sessionBodySchema = z.object({
   externalUserId: z.string().min(1),

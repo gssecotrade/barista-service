@@ -1,5 +1,6 @@
 import OpenAI from "openai";
-import { getPremiumKnowledge } from "./barista-premium-knowledge.service";
+import { getPremiumKnowledge } from "./barista-premium-knowledge.service.js";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -410,9 +411,12 @@ PROHIBIDO
 - contradecir una recomendación previa sin explicarlo
 `.trim();
 
-  const messages = [
+  const messages: ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
-    ...history.slice(-10),
+    ...history.slice(-10).map((msg) => ({
+      role: msg.role === "assistant" ? "assistant" as const : "user" as const,
+      content: msg.content,
+    })),
     { role: "user", content: userMessage },
   ];
 
