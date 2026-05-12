@@ -491,7 +491,19 @@ export async function chatRoutes(app: FastifyInstance) {
                     })
                     : [];
 
-      const validResolvedProducts = resolvedProducts.filter(
+      const horecaMode = looksProfessional;
+
+      const horecaProducts = horecaMode
+        ? resolvedProducts.map((product) => ({
+          ...product,
+          size: "1 KG · HORECA",
+          price: null,
+          horeca: true,
+          ctaLabel: "Solicitar suministro",
+        }))
+        : resolvedProducts;
+
+      const validResolvedProducts = horecaProducts.filter(
         (product): product is ProductPayload => product !== null
       );
 
