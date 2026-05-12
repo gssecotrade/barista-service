@@ -19,6 +19,9 @@ import {
 } from "../services/barista-pricing.service.js";
 import { runBaristaDecisionEngine } from "../services/barista-decision-engine.service.js";
 import { buildCommerceDecision } from "../services/barista-commerce-decision.service.js";
+import {
+  detectPrimaryGoal,
+} from "../services/barista-goal-engine.service.js";
 
 function shouldMentionClubArte(userMessage: string): boolean {
   const msg = userMessage.toLowerCase();
@@ -179,9 +182,10 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const forceStructuredAnswer =
         isPricingIntent ||
+        looksProfessional ||
+        commerceDecision.handled ||
         isMonthlyQuantityIntent(message) ||
-        (isMethodAnswer && isMonthlyQuantityIntent(previousUserGoal)) ||
-        commerceDecision.handled;
+        (isMethodAnswer && isMonthlyQuantityIntent(previousUserGoal));
 
       const averageCupPrice = extractAverageCupPrice(message);
 
@@ -210,9 +214,12 @@ export async function chatRoutes(app: FastifyInstance) {
           },
         });
 
-      const engineResult = forceStructuredAnswer
-        ? null
-        : await runBaristaDecisionEngine({ message });
+      const engineResult =
+        looksProfessional
+          ? await runBaristaDecisionEngine({ message })
+          : forceStructuredAnswer
+            ? null
+            : await runBaristaDecisionEngine({ message });
 
       console.log("ENGINE RESULT:", JSON.stringify(engineResult, null, 2));
 
@@ -303,7 +310,9 @@ export async function chatRoutes(app: FastifyInstance) {
       const forcedCommercialReply =
         engineResult?.type === "professional_volume"
           ? null
-          : buildCommercialQuantityReply(commercialQuantitySource);
+          : looksProfessional
+            ? null
+            : buildCommercialQuantityReply(commercialQuantitySource);
 
       const needsMoreCommercialContext =
         forcedCommercialReply &&
@@ -357,6 +366,8 @@ export async function chatRoutes(app: FastifyInstance) {
         finalBaristaReply +=
           "\n\nSi quieres, te explico de forma breve las ventajas de Club Arte.";
       }
+
+      const primaryGoal = detectPrimaryGoal(message);
 
       const inferredCoffee =
         inferCoffeeFromText(`${message} ${finalBaristaReply}`) ??
@@ -428,34 +439,57 @@ export async function chatRoutes(app: FastifyInstance) {
 
       const packProduct = resolvePackFromReply(message, finalBaristaReply);
 
+      const professionalProduct =
+        engineResult?.type === "professional_volume" && engineResult.mix?.lines?.length
+          ? {
+            ...mapCoffeeToProduct(engineResult.mix.lines[0].handle, {
+              topic: "professional",
+              recipe: null,
+              userMessage: message,
+              reply: finalBaristaReply,
+            })!,
+            format: `${engineResult.meta.recommended1kgBags} kg / mes`,
+            composition: `Suministro recomendado: ${engineResult.meta.recommended1kgBags} bolsas de 1 kg al mes. Para servicio quincenal: ${Math.ceil(engineResult.meta.recommended1kgBags / 2)} bolsas cada 15 días.`,
+            price: undefined,
+            url: engineResult.mix.cartUrl ?? "https://arte-coffee.com/pages/profesionales",
+          }
+          : null;
+
       const shouldForceCommercialProduct =
         !hasPendingQuestion &&
         (Boolean(forcedCommercialReply) || isMonthlyQuantityIntent(commercialQuantitySource));
 
+      const engineProduct =
+        engineResult?.type === "professional_volume"
+          ? resolveProductFromProfessionalEngine(engineResult)
+          : null;
+
       const resolvedProducts =
         hasPendingQuestion
           ? []
-          : packProduct
-            ? [packProduct]
-            : commerceProducts.length > 0
-              ? commerceProducts
-              : shouldForceCommercialProduct
-                ? resolveProductsFromReply({
-                  reply: finalBaristaReply,
-                  fallbackCoffee: inferredCoffee,
-                  topic: inferredTopic,
-                  recipe: inferredRecipe,
-                  userMessage: commercialQuantitySource,
-                })
-                : shouldShowProduct
+          : engineProduct
+            ? [engineProduct]
+            : packProduct
+              ? [packProduct]
+              : commerceProducts.length > 0
+                ? commerceProducts
+                : shouldForceCommercialProduct
                   ? resolveProductsFromReply({
                     reply: finalBaristaReply,
                     fallbackCoffee: inferredCoffee,
                     topic: inferredTopic,
                     recipe: inferredRecipe,
-                    userMessage: message,
+                    userMessage: commercialQuantitySource,
                   })
-                  : [];
+                  : shouldShowProduct
+                    ? resolveProductsFromReply({
+                      reply: finalBaristaReply,
+                      fallbackCoffee: inferredCoffee,
+                      topic: inferredTopic,
+                      recipe: inferredRecipe,
+                      userMessage: message,
+                    })
+                    : [];
 
       const validResolvedProducts = resolvedProducts.filter(
         (product): product is ProductPayload => product !== null
@@ -942,6 +976,21 @@ function resolvePackFromReply(message: string, reply: string): ProductPayload | 
   }
 
   return null;
+}
+
+function resolveProductFromProfessionalEngine(
+  engineResult: Extract<NonNullable<Awaited<ReturnType<typeof runBaristaDecisionEngine>>>, { type: "professional_volume" }>
+): ProductPayload | null {
+  const firstLine = engineResult.mix?.lines?.[0];
+
+  if (!firstLine?.handle) return null;
+
+  return mapCoffeeToProduct(firstLine.handle, {
+    topic: "professional",
+    recipe: null,
+    userMessage: "",
+    reply: engineResult.reply,
+  });
 }
 
 function buildCommercialQuantityReply(message: string): string | null {

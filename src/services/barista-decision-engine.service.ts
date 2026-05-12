@@ -165,80 +165,35 @@ export function detectDecisionIntent(message: string): BaristaDecisionIntent {
 }
 
 export function isProfessionalVolumeIntent(text: string): boolean {
-  return (
-    (text.includes("restaurante") ||
-      text.includes("cafeteria") ||
-      text.includes("cafetería") ||
-      text.includes("hotel") ||
-      text.includes("horeca") ||
-      text.includes("sirvo") ||
-      text.includes("fine dining") ||
-      text.includes("degustacion") ||
-      text.includes("degustación")) &&
-    (text.includes("cafes") ||
-      text.includes("cafés") ||
-      text.includes("tazas") ||
-      text.includes("cada 15 dias") ||
-      text.includes("cada 15 días") ||
-      text.includes("cuanto cafe tendria que comprar") ||
-      text.includes("cuánto café tendría que comprar") ||
-      text.includes("cuanto cafe comprar") ||
-      text.includes("volumen de cafe") ||
-      text.includes("volumen de café"))
-  );
+  const businessSignal =
+    /\b(restaurante|restaurant|resto|cafeter[ií]a|coffee\s*shop|bar|gastro[-\s]?bar|local|espacio|hotel|horeca|hosteler[ií]a|carta|sala|servicio|servimos|sirvo|vendemos|vendo|clientes|comensales)\b/i.test(text);
+
+  const volumeSignal =
+    /\b(\d+\s*(caf[eé]s?|tazas?)|volumen|rotaci[oó]n|consumo|demanda|servicio diario|al d[ií]a|diarios?|mensual|quincenal|cada\s*15\s*d[ií]as|semana|suministro|reposici[oó]n|stock)\b/i.test(text);
+
+  return businessSignal && volumeSignal;
 }
 
 export function isProfessionalPricingStrategyIntent(text: string): boolean {
-  const hasBusinessSignal =
-    text.includes("restaurante") ||
-    text.includes("cafeteria") ||
-    text.includes("cafetería") ||
-    text.includes("hotel") ||
-    text.includes("horeca") ||
-    text.includes("carta") ||
-    text.includes("propuesta para cada variedad") ||
-    text.includes("propuesta de suministro") ||
-    text.includes("cada variedad");
+  const businessSignal =
+    /\b(restaurante|restaurant|resto|cafeter[ií]a|coffee\s*shop|bar|gastro[-\s]?bar|local|espacio|hotel|horeca|hosteler[ií]a|carta|sala|servicio|clientes|comensales|negocio)\b/i.test(text);
 
-  const hasPricingSignal =
-    text.includes("coste por taza") ||
-    text.includes("costo por taza") ||
-    text.includes("precio por taza") ||
-    text.includes("precio de venta") ||
-    text.includes("precio sugerido") ||
-    text.includes("precio recomendado") ||
-    text.includes("margen por taza") ||
-    text.includes("rentabilidad mensual") ||
-    text.includes("rentabilidad") ||
-    text.includes("beneficio por taza") ||
-    text.includes("precio medio") ||
-    text.includes("actualmente mi precio medio") ||
-    text.includes("a que precio deberia vender") ||
-    text.includes("a qué precio debería vender");
+  const pricingSignal =
+    /\b(precio|coste|costo|margen|rentabilidad|beneficio|ticket|venta|vender|cobrar|facturaci[oó]n|por taza|precio medio|precio recomendado|precio sugerido)\b/i.test(text);
 
-  return hasBusinessSignal || hasPricingSignal;
+  return businessSignal && pricingSignal;
 }
 
 export function isMonthlyQuantityIntent(message: string): boolean {
   const text = normalize(message);
 
-  return (
-    text.includes("cuanto comprar") ||
-    text.includes("cuánto comprar") ||
-    text.includes("cantidad a comprar") ||
-    text.includes("que cantidad comprar") ||
-    text.includes("qué cantidad comprar") ||
-    text.includes("mensualmente") ||
-    text.includes("al mes") ||
-    text.includes("consumo mensual") ||
-    text.includes("consumo semanal") ||
-    text.includes("tomo") ||
-    text.includes("cafes al dia") ||
-    text.includes("cafés al día") ||
-    text.includes("rutina de consumo") ||
-    text.includes("que me recomiendas comprar") ||
-    text.includes("qué me recomiendas comprar")
-  );
+  const quantitySignal =
+    /\b(cu[aá]nto|cantidad|comprar|compra|llevarme|necesito|recomiendas|recomendaci[oó]n|planificar|consumo|suministro|reposici[oó]n|stock|mensual|mes|semana|quincena|cada\s*15\s*d[ií]as)\b/i.test(text);
+
+  const coffeeSignal =
+    /\b(caf[eé]|caf[eé]s|taza|tazas|espresso|filtro|v60|moka|italiana|prensa francesa|catuai|pacamara|geisha)\b/i.test(text);
+
+  return quantitySignal && coffeeSignal;
 }
 
 export function parseProfessionalVolumeQuery(message: string): {
@@ -258,9 +213,7 @@ export function parseProfessionalVolumeQuery(message: string): {
   const declaredTotal =
     extractDeclaredTotalCoffeesPerDay(text) ??
     extractDailyCoffeeCount(text) ??
-    extractNumberBefore(text, "tazas") ??
-    extractNumberBefore(text, "cafes") ??
-    extractNumberBefore(text, "cafés");
+    extractGenericCoffeeVolume(text);
 
   const morning = extractMomentCoffeeCount(text, [
     "mañana",
@@ -541,9 +494,28 @@ export function buildProfessionalVolumeReply(
         );
       } else {
         lines.push(
-          `- ${line.name}: ${roundToOneDecimal(line.targetKg)} kg aprox. (${Math.round(line.percentage * 100)}%)`
+          "Formato recomendado:",
+          `- ${result.recommended1kgBags} bolsas de 1 kg`
         );
       }
+
+      lines.push("");
+
+      lines.push(
+        `Suministro recomendado: ${result.recommended1kgBags} bolsas de 1 kg ${periodLabel}.`
+      );
+
+      if (result.days === 30) {
+        lines.push(
+          `Si prefieres suministro quincenal, lo dividiría en ${Math.ceil(result.recommended1kgBags / 2)} bolsas cada 15 días.`
+        );
+      }
+
+      lines.push("");
+
+      lines.push(
+        "Para este volumen, tiene más sentido trabajar con planificación estable y reposición programada que con compra puntual."
+      );
     }
   } else {
     lines.push(
@@ -1071,6 +1043,23 @@ function extractNumberBefore(text: string, phrase: string): number | null {
 
   const value = Number(match[1]);
   return Number.isFinite(value) ? value : null;
+}
+
+function extractGenericCoffeeVolume(text: string): number | null {
+  const patterns = [
+    /(\d+)\s*(caf[eé]s?|tazas?)/i,
+    /(sirvo|servimos|vendo|vendemos|preparo|preparamos)\s*(unos|unas|aprox\.?|aproximadamente)?\s*(\d+)/i,
+    /(unos|unas|aprox\.?|aproximadamente)\s*(\d+)\s*(caf[eé]s?|tazas?)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const raw = match?.[3] ?? match?.[2] ?? match?.[1];
+    const value = Number(raw);
+    if (Number.isFinite(value)) return value;
+  }
+
+  return null;
 }
 
 function normalize(value: string): string {

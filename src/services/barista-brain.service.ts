@@ -17,11 +17,14 @@ export async function generateBaristaResponse({
   userMessage,
   history = [],
   context,
+  primaryGoal,
 }: {
   userMessage: string;
   history: { role: string; content: string }[];
   context?: BaristaContext;
+  primaryGoal?: string;
 }) {
+
   const premiumKnowledge = getPremiumKnowledge({
     moment: detectMoment(userMessage),
     ingredient: detectIngredient(userMessage),
@@ -89,6 +92,12 @@ Puedes:
 ---
 
 INTELIGENCIA DE RESPUESTA
+
+Objetivo principal detectado:
+${primaryGoal || "no definido"}
+
+Usa este objetivo como guía prioritaria para responder. 
+Si el objetivo es compra mensual, cantidad, recomendación de producto o consumo, no respondas de forma genérica: pide solo el dato imprescindible que falte o cierra con una recomendación concreta.
 
 Antes de responder:
 1. Detecta la intención principal:
